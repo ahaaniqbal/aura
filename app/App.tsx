@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator, Animated, Easing, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, Pressable,
+  ActivityIndicator, Alert, Animated, Dimensions, Easing, KeyboardAvoidingView, LayoutAnimation, Modal, PanResponder, Platform, Pressable,
   SafeAreaView, ScrollView, StyleSheet, Text, TextInput, UIManager, View,
 } from "react-native";
 
@@ -20,8 +20,11 @@ import { Feather } from "@expo/vector-icons";
 import Orb from "./components/Orb";
 import BrandIcon from "./components/BrandIcon";
 import MicButton from "./components/MicButton";
-import { c, font, r, sp, type as ty } from "./theme";
-import { addNote, approve, capture, Card, connect, Feed, getConnections, getFeed, Memory, Message, setLocation, simulate, syncEmail } from "./lib/api";
+import { c, font, r, shadow, sp, type as ty } from "./theme";
+import { addNote, approve, capture, Card, clearChat, connect, Feed, getConnections, getFeed, Memory, Message, setLocation, simulate, syncEmail } from "./lib/api";
+
+const SCREEN_W = Dimensions.get("window").width;
+const SWIPE_THRESH = 100;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -56,6 +59,7 @@ export default function App() {
   const first = useRef(true);
   const sigRef = useRef("");
   const sendingRef = useRef(false);
+  const seenMsg = useRef<Set<string>>(new Set());
   const scroller = useRef<ScrollView>(null);
 
   const refresh = useCallback(async () => {
@@ -69,6 +73,15 @@ export default function App() {
           }
         }
         seen.current.add(card.id);
+      }
+      for (const m of f.messages || []) {
+        if (m.kind === "reminder" && !seenMsg.current.has(m.id)) {
+          if (!first.current) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+            Notifications.scheduleNotificationAsync({ content: { title: "aura", body: m.content }, trigger: null }).catch(() => {});
+          }
+        }
+        seenMsg.current.add(m.id);
       }
       first.current = false;
       const sig = `${(f.messages || []).length}:${(f.messages || []).slice(-1)[0]?.id || ""}:${(f.cards || []).map((x) => x.id + x.status + x.body).join(",")}:${(f.memories || []).length}:${f.context?.status || ""}`;
@@ -151,6 +164,18 @@ export default function App() {
       }
     } catch (e) { /* ignore */ }
   };
+  const clearChatFlow = () => {
+    Alert.alert("clear chat?", "this clears the conversation. your memory stays.", [
+      { text: "cancel", style: "cancel" },
+      { text: "clear", style: "destructive", onPress: async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+        setPending([]); setThinking(false);
+        try { await clearChat(); } catch (e) {}
+        seen.current.clear(); seenMsg.current.clear(); sigRef.current = "";
+        ease(); refresh();
+      } },
+    ]);
+  };
 
   if (!loaded) {
     return <View style={[s.fill, s.center, { backgroundColor: c.bg }]}><Orb size={120} state="idle" /></View>;
@@ -161,6 +186,7 @@ export default function App() {
   const headerState: "idle" | "thinking" | "warm" = busy || thinking ? "thinking" : pendingUrgent ? "warm" : "idle";
   const locName = feed?.context?.location?.name;
   const status = feed?.context?.in_meeting ? "in a meeting" : (locName && locName !== "nearby" ? "near " + locName : "all quiet");
+  const hasChat = (feed?.messages?.length || 0) > 0 || pending.length > 0;
   const cardById = (id: string | null) => (id ? cards.find((x) => x.id === id) : undefined);
   const notes = (feed?.memories || []).filter((m) => m.source === "note");
 
@@ -173,9 +199,16 @@ export default function App() {
           <Text style={s.brand}>Aura</Text>
           <Text style={s.status}>{status}</Text>
         </View>
-        <Pressable onPress={() => setDemoOpen(true)} style={({ pressed }) => [s.demoBtn, pressed && s.pressed]} hitSlop={10}>
-          <Text style={s.demoBtnTxt}>✦ demo</Text>
-        </Pressable>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {tab === "chat" && hasChat ? (
+            <Press onPress={clearChatFlow} style={s.iconBtn} hitSlop={10}>
+              <Feather name="trash-2" size={16} color={c.muted} />
+            </Press>
+          ) : null}
+          <Press onPress={() => setDemoOpen(true)} style={s.demoBtn} hitSlop={10}>
+            <Text style={s.demoBtnTxt}>✦ demo</Text>
+          </Press>
+        </View>
       </View>
 
       {tab === "chat" && (
@@ -198,9 +231,9 @@ export default function App() {
           <View style={s.composer}>
             <TextInput style={s.input} value={draft} onChangeText={setDraft} placeholder="tell aura anything" placeholderTextColor={c.muted} multiline />
             <MicButton onResult={(t) => setDraft((d) => (d ? d + " " + t : t))} disabled={busy} />
-            <Pressable onPress={send} style={({ pressed }) => [s.sendBtn, { opacity: draft.trim() ? 1 : 0.4 }, pressed && s.pressed]} disabled={!draft.trim()}>
-              {busy ? <ActivityIndicator color={c.text} /> : <Feather name="arrow-up" size={20} color={c.text} />}
-            </Pressable>
+            <Press onPress={send} style={[s.sendBtn, { opacity: draft.trim() ? 1 : 0.4 }]} disabled={!draft.trim()}>
+              {busy ? <ActivityIndicator color={c.bg} /> : <Feather name="arrow-up" size={20} color={c.bg} />}
+            </Press>
           </View>
         </KeyboardAvoidingView>
       )}
@@ -210,10 +243,10 @@ export default function App() {
 
       <View style={s.tabs}>
         {([["chat", "message-circle", "chat"], ["notes", "edit-3", "notes"], ["connect", "grid", "connect"]] as const).map(([k, icon, l]) => (
-          <Pressable key={k} onPress={() => { Haptics.selectionAsync().catch(() => {}); ease(); setTab(k as any); }} style={({ pressed }) => [s.tab, tab === k && s.tabActive, pressed && s.pressed]}>
+          <Press key={k} onPress={() => { Haptics.selectionAsync().catch(() => {}); ease(); setTab(k as any); }} style={[s.tab, tab === k && s.tabActive]}>
             <Feather name={icon as any} size={19} color={tab === k ? c.text : c.muted} style={{ marginBottom: 3 }} />
             <Text style={[s.tabLabel, { color: tab === k ? c.text : c.muted }]}>{l}</Text>
-          </Pressable>
+          </Press>
         ))}
       </View>
 
@@ -237,9 +270,28 @@ export default function App() {
 function FadeInUp({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   const a = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(a, { toValue: 1, duration: 320, delay, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    Animated.timing(a, { toValue: 1, duration: 400, delay, easing: Easing.bezier(0.16, 1, 0.3, 1), useNativeDriver: true }).start();
   }, []);
-  return <Animated.View style={{ opacity: a, transform: [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>{children}</Animated.View>;
+  return <Animated.View style={{ opacity: a, transform: [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }, { scale: a.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }) }] }}>{children}</Animated.View>;
+}
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+// smooth spring press, the react native equivalent of a framer motion tap/hover.
+function Press({ children, onPress, disabled, style, scaleTo = 0.97, hitSlop }: { children: React.ReactNode; onPress?: () => void; disabled?: boolean; style?: any; scaleTo?: number; hitSlop?: number }) {
+  const a = useRef(new Animated.Value(1)).current;
+  const to = (v: number) => Animated.spring(a, { toValue: v, useNativeDriver: true, friction: 7, tension: 140 }).start();
+  return (
+    <AnimatedPressable
+      onPressIn={() => { if (!disabled) to(scaleTo); }}
+      onPressOut={() => to(1)}
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={hitSlop}
+      style={[style, { transform: [{ scale: a }] }]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
 }
 
 function Bubble({ m }: { m: Message }) {
@@ -280,32 +332,70 @@ function InlineCard({ card, onAct, busy }: { card: Card; onAct: (c: Card, d: "ap
   const done = card.status === "done";
   const dismissed = card.status === "dismissed";
   const urgent = card.type === "urgent";
-  if (dismissed) return null;
+  const pan = useRef(new Animated.Value(0)).current;
+  const [gone, setGone] = useState(false);
+  const acting = useRef(false);
+  const onActRef = useRef(onAct); onActRef.current = onAct;
+  const cardRef = useRef(card); cardRef.current = card;
+  const finish = (decision: "approve" | "decline", dir: number) => {
+    if (acting.current) return;
+    acting.current = true;
+    Haptics.notificationAsync(decision === "approve" ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning).catch(() => {});
+    Animated.timing(pan, { toValue: dir * (SCREEN_W + 80), duration: 240, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(() => {
+      setGone(true);
+      onActRef.current(cardRef.current, decision);
+    });
+  };
+  const responder = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => !acting.current && Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.3,
+    onPanResponderMove: (_, g) => pan.setValue(g.dx),
+    onPanResponderRelease: (_, g) => {
+      if (g.dx > SWIPE_THRESH) finish("approve", 1);
+      else if (g.dx < -SWIPE_THRESH) finish("decline", -1);
+      else Animated.spring(pan, { toValue: 0, useNativeDriver: true, friction: 6, tension: 140 }).start();
+    },
+    onPanResponderTerminate: () => Animated.spring(pan, { toValue: 0, useNativeDriver: true, friction: 6, tension: 140 }).start(),
+  })).current;
+
+  if (dismissed || gone) return null;
+
+  if (done) {
+    return (
+      <View style={s.card}>
+        <Text style={s.cardTitle}>{card.title}</Text>
+        <Text style={s.cardBody}>{card.body}</Text>
+        <View style={s.doneRow}><Feather name="check" size={15} color="#5BA37E" style={{ marginRight: 5 }} /><Text style={s.doneTxt}>done</Text></View>
+      </View>
+    );
+  }
+
+  const rotate = pan.interpolate({ inputRange: [-SCREEN_W / 2, 0, SCREEN_W / 2], outputRange: ["-7deg", "0deg", "7deg"], extrapolate: "clamp" });
+  const approveOp = pan.interpolate({ inputRange: [14, 96], outputRange: [0, 1], extrapolate: "clamp" });
+  const nopeOp = pan.interpolate({ inputRange: [-96, -14], outputRange: [1, 0], extrapolate: "clamp" });
   return (
-    <View style={[s.card, urgent && !done && s.cardUrgent]}>
-      {!done && (card.memory_refs?.length || urgent) ? (
+    <Animated.View style={[s.card, urgent && s.cardUrgent, { transform: [{ translateX: pan }, { rotate }] }]} {...responder.panHandlers}>
+      <Animated.View pointerEvents="none" style={[s.stamp, s.stampApprove, { opacity: approveOp }]}><Text style={s.stampApproveTxt}>approve</Text></Animated.View>
+      <Animated.View pointerEvents="none" style={[s.stamp, s.stampNope, { opacity: nopeOp }]}><Text style={s.stampNopeTxt}>not now</Text></Animated.View>
+      {(card.memory_refs?.length || urgent) ? (
         <View style={s.chipRow}>
           {urgent && <View style={s.tag}><Text style={s.tagTxt}>urgent</Text></View>}
-          {(card.memory_refs || []).slice(0, 2).map((mr, i) => (
-            <View key={i} style={s.chip}><Text style={s.chipTxt}>🧠 {mr}</Text></View>
-          ))}
+          {(card.memory_refs || []).slice(0, 1).map((mr, i) => {
+            const short = String(mr).split("\n")[0].replace(/^extra context:\s*/i, "").trim();
+            return <View key={i} style={s.chip}><Text style={s.chipTxt} numberOfLines={1}>🧠 {short.length > 36 ? short.slice(0, 36) + "…" : short}</Text></View>;
+          })}
         </View>
       ) : null}
       <Text style={s.cardTitle}>{card.title}</Text>
       <Text style={s.cardBody}>{card.body}</Text>
-      {done ? (
-        <View style={s.doneRow}><Feather name="check" size={15} color="#5BA37E" style={{ marginRight: 5 }} /><Text style={s.doneTxt}>done</Text></View>
-      ) : (
-        <View style={s.btnRow}>
-          <Pressable style={({ pressed }) => [s.approve, pressed && s.pressed]} onPress={() => onAct(card, "approve")} disabled={busy}>
-            <Text style={s.approveTxt}>approve</Text>
-          </Pressable>
-          <Pressable style={({ pressed }) => [s.decline, pressed && s.pressed]} onPress={() => onAct(card, "decline")} disabled={busy}>
-            <Text style={s.declineTxt}>not now</Text>
-          </Pressable>
-        </View>
-      )}
-    </View>
+      <View style={s.btnRow}>
+        <Press style={s.approve} onPress={() => finish("approve", 1)} disabled={busy}>
+          <Text style={s.approveTxt}>approve</Text>
+        </Press>
+        <Press style={s.decline} onPress={() => finish("decline", -1)} disabled={busy}>
+          <Text style={s.declineTxt}>not now</Text>
+        </Press>
+      </View>
+    </Animated.View>
   );
 }
 
@@ -330,9 +420,9 @@ function NotesView({ notes, onAdd, busy }: { notes: Memory[]; onAdd: (t: string)
             <Text style={s.noteHint}>{d.trim() ? "saves to your memory" : "type or speak"}</Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <MicButton onResult={(t) => setD((p) => (p ? p + " " + t : t))} disabled={busy} size={40} />
-              <Pressable onPress={submit} disabled={!d.trim()} style={({ pressed }) => [s.saveBtn, { opacity: d.trim() ? 1 : 0.4 }, pressed && s.pressed]}>
+              <Press onPress={submit} disabled={!d.trim()} style={[s.saveBtn, { opacity: d.trim() ? 1 : 0.4 }]}>
                 {busy ? <ActivityIndicator color={c.bg} /> : <Text style={s.saveTxt}>save</Text>}
-              </Pressable>
+              </Press>
             </View>
           </View>
         </View>
@@ -362,16 +452,16 @@ function ConnectView({ serverConnected, onConnect }: { serverConnected: string[]
         const on = !!t.slug && serverConnected.includes(t.slug);
         const connectable = !!t.slug;
         return (
-          <Pressable key={t.key} style={({ pressed }) => [s.tool, pressed && connectable && s.pressed]} onPress={() => connectable && onConnect(t.slug)} disabled={!connectable || on}>
+          <Press key={t.key} style={s.tool} onPress={() => connectable && onConnect(t.slug)} disabled={!connectable || on}>
             <View style={s.toolTile}>{t.brand ? <BrandIcon brand={t.brand} size={22} /> : <Feather name={t.icon as any} size={18} color={c.text} />}</View>
             <View style={{ flex: 1 }}>
               <Text style={s.toolLabel}>{t.label}</Text>
               <Text style={s.toolSub}>{t.sub}</Text>
             </View>
-            <View style={[s.connectPill, on && s.connectPillOn]}>
-              <Text style={[s.connectPillTxt, on && { color: c.text }]}>{on ? "connected" : connectable ? "connect" : "soon"}</Text>
+            <View style={[s.connectPill, on ? s.connectPillOn : !connectable && s.connectPillSoon]}>
+              <Text style={[s.connectPillTxt, { color: on ? c.text : !connectable ? c.muted : c.bg }]}>{on ? "connected" : connectable ? "connect" : "soon"}</Text>
             </View>
-          </Pressable>
+          </Press>
         );
       })}
     </ScrollView>
@@ -389,10 +479,10 @@ const EmptyChat = () => (
 );
 
 const DemoBtn = ({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) => (
-  <Pressable style={({ pressed }) => [s.demoRow, pressed && s.pressed]} onPress={onPress}>
+  <Press style={s.demoRow} onPress={onPress}>
     <Feather name={icon as any} size={18} color={c.text} style={{ marginRight: 12 }} />
     <Text style={s.demoRowTxt}>{label}</Text>
-  </Pressable>
+  </Press>
 );
 
 const s = StyleSheet.create({
@@ -404,34 +494,40 @@ const s = StyleSheet.create({
   brand: { fontFamily: font.display, fontSize: ty.h2, color: c.text, letterSpacing: -0.5 },
   status: { fontFamily: font.body, fontSize: ty.caption, color: c.muted, marginTop: 1 },
   demoBtn: { paddingHorizontal: sp.m, paddingVertical: sp.s, borderRadius: r.chip, backgroundColor: c.surfaceAlt },
+  iconBtn: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: c.surfaceAlt },
   demoBtnTxt: { fontFamily: font.medium, fontSize: ty.caption, color: c.muted },
 
   row: { flexDirection: "row", marginBottom: sp.m },
-  bubble: { maxWidth: "82%", paddingHorizontal: sp.l, paddingVertical: sp.m, borderRadius: r.bubble },
+  bubble: { maxWidth: "82%", paddingHorizontal: 15, paddingVertical: 11, borderRadius: r.bubble },
   bubbleAura: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.hairline, borderBottomLeftRadius: 6 },
   bubbleUser: { backgroundColor: c.userBubble, borderBottomRightRadius: 6 },
   bubbleTxt: { fontFamily: font.body, fontSize: ty.body, lineHeight: 23, color: c.text },
 
-  card: { backgroundColor: c.surface, borderRadius: r.card, borderWidth: 1, borderColor: c.hairline, padding: sp.l, marginBottom: sp.l, marginTop: -sp.xs, shadowColor: "#998", shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
-  cardUrgent: { borderLeftWidth: 4, borderLeftColor: c.blush },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: sp.s },
-  tag: { backgroundColor: c.blush, paddingHorizontal: sp.s, paddingVertical: 3, borderRadius: r.chip },
-  tagTxt: { fontFamily: font.bold, fontSize: 10, color: c.text, letterSpacing: 0.6 },
-  chip: { backgroundColor: c.chipBg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: r.chip },
-  chipTxt: { fontFamily: font.medium, fontSize: ty.caption, color: c.text, textTransform: "lowercase" },
-  cardTitle: { fontFamily: font.display, fontSize: ty.title, color: c.text, letterSpacing: -0.3, marginBottom: 4, textTransform: "lowercase" },
-  cardBody: { fontFamily: font.body, fontSize: ty.subhead, lineHeight: 21, color: c.muted, marginBottom: sp.m, textTransform: "lowercase" },
-  btnRow: { flexDirection: "row", gap: sp.m },
-  approve: { backgroundColor: c.text, paddingVertical: sp.m, paddingHorizontal: sp.xl, borderRadius: r.button, flex: 1, alignItems: "center" },
+  card: { ...shadow.card, backgroundColor: c.surface, borderRadius: r.card, borderWidth: 1, borderColor: c.hairline, padding: 18, marginBottom: sp.l, marginTop: 2 },
+  cardUrgent: { borderColor: "#F3B7B0", backgroundColor: "#FFF6F4" },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginBottom: sp.m },
+  tag: { backgroundColor: c.blush, paddingHorizontal: 9, paddingVertical: 4, borderRadius: r.chip, alignItems: "center", justifyContent: "center" },
+  tagTxt: { fontFamily: font.bold, fontSize: 10, lineHeight: 13, color: c.text, letterSpacing: 0.5 },
+  chip: { backgroundColor: c.chipBg, paddingHorizontal: 9, paddingVertical: 3, borderRadius: r.chip, alignSelf: "flex-start", maxWidth: "100%" },
+  chipTxt: { fontFamily: font.medium, fontSize: 11.5, color: c.muted, textTransform: "lowercase" },
+  cardTitle: { fontFamily: font.display, fontSize: ty.title, color: c.text, letterSpacing: -0.3, marginBottom: 6, textTransform: "lowercase" },
+  cardBody: { fontFamily: font.body, fontSize: ty.subhead, lineHeight: 22, color: c.muted, marginBottom: sp.l, textTransform: "lowercase" },
+  btnRow: { flexDirection: "row", gap: 10 },
+  approve: { ...shadow.soft, backgroundColor: c.accent, height: 50, borderRadius: r.button, flex: 1, alignItems: "center", justifyContent: "center" },
   approveTxt: { fontFamily: font.semibold, fontSize: ty.subhead, color: c.bg },
-  decline: { paddingVertical: sp.m, paddingHorizontal: sp.l, borderRadius: r.button, borderWidth: 1, borderColor: c.hairline, alignItems: "center", justifyContent: "center" },
+  decline: { height: 50, paddingHorizontal: sp.xl, borderRadius: r.button, borderWidth: 1, borderColor: c.hairline, backgroundColor: c.surface, alignItems: "center", justifyContent: "center" },
   declineTxt: { fontFamily: font.medium, fontSize: ty.subhead, color: c.muted },
   doneRow: { flexDirection: "row", alignItems: "center" },
   doneTxt: { fontFamily: font.semibold, fontSize: ty.subhead, color: "#5BA37E" },
+  stamp: { position: "absolute", top: 14, zIndex: 8, paddingHorizontal: 11, paddingVertical: 5, borderRadius: 9, borderWidth: 2.5, backgroundColor: "rgba(255,253,250,0.92)" },
+  stampApprove: { left: 14, borderColor: "#5BA37E", transform: [{ rotate: "-12deg" }] },
+  stampNope: { right: 14, borderColor: "#D98A86", transform: [{ rotate: "12deg" }] },
+  stampApproveTxt: { fontFamily: font.bold, fontSize: 14, color: "#5BA37E", letterSpacing: 1 },
+  stampNopeTxt: { fontFamily: font.bold, fontSize: 14, color: "#D98A86", letterSpacing: 1 },
 
   composer: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: sp.l, paddingVertical: sp.m, borderTopWidth: 1, borderTopColor: c.hairline, backgroundColor: c.bg, gap: sp.s },
   input: { flex: 1, maxHeight: 120, minHeight: 46, backgroundColor: c.surface, borderRadius: r.input, borderWidth: 1, borderColor: c.hairline, paddingHorizontal: sp.l, paddingTop: 12, paddingBottom: 12, fontFamily: font.body, fontSize: ty.body, color: c.text },
-  sendBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: c.lavender, alignItems: "center", justifyContent: "center" },
+  sendBtn: { ...shadow.soft, width: 46, height: 46, borderRadius: 23, backgroundColor: c.accent, alignItems: "center", justifyContent: "center" },
   sendTxt: { fontFamily: font.bold, fontSize: 20, color: c.text },
 
   tabs: { flexDirection: "row", borderTopWidth: 1, borderTopColor: c.hairline, paddingTop: sp.s, paddingBottom: sp.l, paddingHorizontal: sp.l, backgroundColor: c.bg },
@@ -445,29 +541,30 @@ const s = StyleSheet.create({
   lede: { fontFamily: font.body, fontSize: ty.subhead, lineHeight: 22, color: c.muted, marginTop: 4 },
 
   notesTitle: { fontFamily: font.display, fontSize: ty.hero, color: c.text, letterSpacing: -0.8, marginBottom: sp.l },
-  notePage: { backgroundColor: c.surface, borderRadius: r.card, borderWidth: 1, borderColor: c.hairline, padding: sp.xl, minHeight: 210, shadowColor: "#998", shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
+  notePage: { ...shadow.card, backgroundColor: c.surface, borderRadius: r.card, borderWidth: 1, borderColor: c.hairline, padding: sp.xl, minHeight: 210 },
   notePageInput: { fontFamily: font.body, fontSize: 18, lineHeight: 28, color: c.text, minHeight: 130, padding: 0 },
   notePageFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: sp.l, borderTopWidth: 1, borderTopColor: c.hairline, paddingTop: sp.m },
   noteHint: { fontFamily: font.body, fontSize: ty.caption, color: c.muted },
-  saveBtn: { backgroundColor: c.text, paddingHorizontal: sp.xl, paddingVertical: 11, borderRadius: r.button },
+  saveBtn: { ...shadow.soft, backgroundColor: c.accent, paddingHorizontal: sp.xl, paddingVertical: 11, borderRadius: r.button },
   saveTxt: { fontFamily: font.semibold, fontSize: ty.subhead, color: c.bg },
   notesSection: { fontFamily: font.medium, fontSize: ty.caption, color: c.muted, marginTop: sp.xxl, marginBottom: sp.xs, letterSpacing: 0.3 },
   noteItem: { flexDirection: "row", alignItems: "flex-start", gap: sp.m, paddingVertical: sp.m, paddingHorizontal: sp.xs },
   noteDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: c.lavender, marginTop: 9 },
   noteItemTxt: { flex: 1, fontFamily: font.body, fontSize: ty.body, lineHeight: 24, color: c.text },
 
-  tool: { flexDirection: "row", alignItems: "center", width: "100%", backgroundColor: c.surface, borderRadius: r.bubble, borderWidth: 1, borderColor: c.hairline, padding: sp.l, marginBottom: sp.m, gap: sp.m },
-  toolTile: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: c.surface, borderWidth: 1, borderColor: c.hairline },
+  tool: { ...shadow.soft, flexDirection: "row", alignItems: "center", width: "100%", backgroundColor: c.surface, borderRadius: 18, borderWidth: 1, borderColor: c.hairline, padding: sp.l, marginBottom: sp.m, gap: sp.m },
+  toolTile: { width: 44, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: c.bg, borderWidth: 1, borderColor: c.hairline },
   toolLabel: { fontFamily: font.semibold, fontSize: ty.body, color: c.text },
   toolSub: { fontFamily: font.body, fontSize: ty.caption, color: c.muted, marginTop: 1 },
-  connectPill: { paddingHorizontal: sp.l, paddingVertical: sp.s, borderRadius: r.chip, borderWidth: 1, borderColor: c.text },
-  connectPillOn: { backgroundColor: c.mint, borderColor: c.mint },
-  connectPillTxt: { fontFamily: font.semibold, fontSize: ty.caption, color: c.text },
+  connectPill: { paddingHorizontal: sp.l, paddingVertical: 7, borderRadius: r.chip, backgroundColor: c.accent },
+  connectPillOn: { backgroundColor: c.mint },
+  connectPillSoon: { backgroundColor: c.surfaceAlt },
+  connectPillTxt: { fontFamily: font.semibold, fontSize: ty.caption, color: c.bg },
 
   modalBg: { flex: 1, backgroundColor: "rgba(20,16,12,0.35)", justifyContent: "flex-end" },
   sheet: { backgroundColor: c.bg, borderTopLeftRadius: r.sheet, borderTopRightRadius: r.sheet, padding: sp.xl, paddingBottom: sp.xh },
   sheetTitle: { fontFamily: font.display, fontSize: ty.h2, color: c.text, letterSpacing: -0.4, textTransform: "lowercase" },
   sheetSub: { fontFamily: font.body, fontSize: ty.caption, color: c.muted, marginBottom: sp.l },
-  demoRow: { flexDirection: "row", alignItems: "center", backgroundColor: c.surface, borderWidth: 1, borderColor: c.hairline, borderRadius: r.bubble, padding: sp.l, marginTop: sp.m },
+  demoRow: { ...shadow.soft, flexDirection: "row", alignItems: "center", backgroundColor: c.surface, borderWidth: 1, borderColor: c.hairline, borderRadius: 16, padding: sp.l, marginTop: sp.m },
   demoRowTxt: { fontFamily: font.medium, fontSize: ty.body, color: c.text },
 });

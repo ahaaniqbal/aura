@@ -43,18 +43,25 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
     let confirm = "";
     let memo = "";
     if (action.kind === "buy") {
-      result = result || { merchant: payload.merchant || "tartine bakery", item: payload.item || "chocolate cake", total: payload.total || "$58.00", eta: payload.eta || "today", order_id: rid("AC-"), paid_with: "aura virtual card (test)" };
-      confirm = `done. ordered the ${result.item} from ${result.merchant}, ${result.eta}. paid on your aura card, handled.`;
-      memo = `ordered ${result.item} from ${result.merchant} (${result.total}) for ${action.title}.`;
+      const merchant = payload.merchant || "the bakery";
+      const item = payload.item || "chocolate cake";
+      result = result || { merchant, item, total: payload.total || "$54.00", eta: payload.eta || "today", order_id: rid("AC-"), paid_with: "aura virtual card ••4360 (test)" };
+      confirm = `done. ordered the ${item} from ${merchant}, ${result.eta}. paid on your aura card ••4360, handled.`;
+      memo = `ordered ${item} from ${merchant} (${result.total}) for ${action.title}.`;
     } else if (action.kind === "email_send") {
       const draftBody = body.edited_body || payload.body || "";
       const to = payload.to || "";
       if (to.includes("@")) {
         const params: any = { recipient_email: to, subject: payload.subject || "", body: draftBody };
         if (payload.thread_id) params.thread_id = payload.thread_id;
-        const r = await exec(BUTTERBASE_API_URL, BUTTERBASE_APP_ID, BUTTERBASE_API_KEY, "GMAIL_CREATE_EMAIL_DRAFT", params, userId);
-        if (r?.successful || r?.data) { result = { drafted_to: to, gmail: true }; confirm = `saved a reply to ${to} in your gmail drafts, ready when you are.`; }
-        else { result = { drafted_to: to, gmail: false, error: r?.error }; confirm = `drafted a reply to ${to}. (couldn't reach gmail just now, it's saved here.)`; }
+        const r = await exec(BUTTERBASE_API_URL, BUTTERBASE_APP_ID, BUTTERBASE_API_KEY, "GMAIL_SEND_EMAIL", params, userId);
+        if (!(r?.successful || r?.data?.id)) {
+          // send failed: leave the card pending so the user can retry
+          const fm = await ctx.db.query("INSERT INTO messages (user_id, role, content, kind) VALUES ($1,'aura',$2,'chat') RETURNING *", [userId, `couldn't send to ${to} just now. tap approve to try again.`]);
+          return json({ ok: false, error: "send_failed", detail: r?.error || r, message: fm.rows[0] });
+        }
+        result = { sent_to: to, gmail: true, id: r?.data?.id, thread: r?.data?.threadId };
+        confirm = `sent your reply to ${to}. that's handled, back to your day.`;
       } else {
         result = { sent_to: to, subject: payload.subject };
         confirm = `sent to ${to || "them"}. that's wrapped, back to your day.`;

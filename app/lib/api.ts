@@ -63,6 +63,8 @@ export const approve = (action_id: string, decision: "approve" | "decline" = "ap
 export const simulate = (scenario: string, extra: any = {}) => post("simulate", { scenario, ...extra });
 export const addNote = (text: string) => post("note", { text });
 export const syncEmail = () => post("sync_email", {});
+// clears the conversation and cards, keeps memory (reset with keep_memories).
+export const clearChat = () => post("reset", { keep_memories: true });
 export const setLocation = (lat: number, lng: number, place: string) => post("set_location", { lat, lng, place });
 export const transcribe = async (audio_base64: string, mime = "audio/m4a"): Promise<string> => {
   try {

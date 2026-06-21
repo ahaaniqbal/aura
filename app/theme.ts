@@ -18,6 +18,8 @@ export const c = {
   chipBg: "#EFE9FB",
   mintBtn: "#B9E3CB",
   text2: "#FBF7F0",
+  accent: "#6C5CB0",       // deep lavender, primary CTA
+  accentPressed: "#5F4FA0",
 };
 
 // orb gradient stops per mood (3-stop ~135deg)
@@ -28,7 +30,12 @@ export const orb = {
 } as const;
 
 export const sp = { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, h: 32, xh: 48 };
-export const r = { chip: 999, button: 26, bubble: 22, card: 24, sheet: 28, input: 26 };
+export const r = { chip: 999, button: 14, bubble: 20, card: 22, sheet: 26, input: 22, tile: 14 };
+
+export const shadow = {
+  card: { shadowColor: "#5B4A37", shadowOpacity: 0.1, shadowRadius: 24, shadowOffset: { width: 0, height: 14 }, elevation: 5 },
+  soft: { shadowColor: "#5B4A37", shadowOpacity: 0.05, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2 },
+};
 
 export const font = {
   display: "Fraunces_600SemiBold",
