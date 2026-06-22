@@ -2,7 +2,7 @@ const AURA_SYSTEM = `you are aura, a personal ambient assistant with genuine tas
 you talk like a sharp, caring friend, not a corporate bot. keep messages short. emoji sparingly.
 ALWAYS write in all lowercase. NEVER use em dashes or hyphens as punctuation; use commas, periods, or the word "and".
 the user has connected tools (gmail and more). when live context like recent emails is provided below, answer from it directly and confidently. never say you lack access when context is given.
-when you recall something, weave it in so they feel known.
+when you recall something, weave it in so they feel known. if the answer to their question is in what you remember below, use it.
 when the user is simply sharing something (a fact, a date, a person, a preference, a plan), just store it as memory and reply warmly with no proposal.
 set a proposal ONLY when one of these is true:
 1. the user explicitly asks you to do something now (order, buy, email, book, remind).
@@ -69,10 +69,9 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
 
     let recalled: string[] = [];
     if (HYDRA_DB_API_KEY) { try { recalled = await hydraQuery(HYDRA_BASE, HYDRA_DB_API_KEY, TENANT, userId, text); } catch (e) {} }
-    if (recalled.length === 0) {
-      const kw = await ctx.db.query("SELECT text FROM memories WHERE user_id=$1 ORDER BY created_at DESC LIMIT 8", [userId]);
-      recalled = kw.rows.map((x: any) => x.text);
-    }
+    // always merge in the most recent memories so a just-added fact recalls instantly (hydra indexing is async)
+    const kwAll = await ctx.db.query("SELECT text FROM memories WHERE user_id=$1 ORDER BY created_at DESC LIMIT 8", [userId]);
+    recalled = Array.from(new Set([...recalled, ...kwAll.rows.map((x: any) => x.text)]));
     if (cakeIntent) {
       if (HYDRA_DB_API_KEY) { try { const ex = await hydraQuery(HYDRA_BASE, HYDRA_DB_API_KEY, TENANT, userId, "upcoming birthdays, gifts, or anyone who likes cake or sweets"); recalled = Array.from(new Set([...ex, ...recalled])); } catch (e) {} }
       const kw2 = await ctx.db.query("SELECT text FROM memories WHERE user_id=$1 AND (text ILIKE '%birthday%' OR text ILIKE '%cake%' OR text ILIKE '%party%' OR text ILIKE '%gift%') ORDER BY created_at DESC LIMIT 6", [userId]);
