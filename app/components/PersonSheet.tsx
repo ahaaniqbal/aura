@@ -5,6 +5,7 @@ import { Feather } from "@expo/vector-icons";
 import Avatar from "./Avatar";
 import { c, font, shadow } from "../theme";
 import type { GraphPerson } from "../lib/api";
+import { closeness, warmth, tieLabel } from "../lib/weight";
 
 // The person detail. Tap a star in the constellation and the relationship opens up: who they
 // are, what they're carrying, what they want, and what you owe them, each with a way to act.
@@ -35,7 +36,10 @@ export default function PersonSheet({ person, onClose, onAct }: { person: GraphP
   const promises = (p?.open_promises || []).filter(Boolean);
   const bd = daysUntilBirthday(p?.birthday);
   const bsoon = bd !== null && bd <= 45;
-  const ring = bsoon ? c.pink : promises.length ? c.coral : c.mint;
+  const cl = p ? closeness(p) : 0;
+  const w = p ? warmth(p) : 1;
+  const drift = w < 0.5 && cl >= 34;
+  const ring = bsoon ? c.pink : promises.length ? c.coral : drift ? c.blue : c.mint;
 
   const run = (t: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); onClose(); onAct(t); };
   const gift = () => run(`help me get ${first} something they'd love. they've mentioned wanting: ${wants.join(", ")}. suggest something thoughtful and offer to handle it for me.`);
@@ -57,6 +61,11 @@ export default function PersonSheet({ person, onClose, onAct }: { person: GraphP
                 </Text>
               </View>
               <Pressable onPress={onClose} hitSlop={10} style={st.x}><Feather name="x" size={18} color={c.ink} /></Pressable>
+            </View>
+
+            <View style={st.tie}>
+              <View style={st.meterTrack}><View style={[st.meterFill, { width: `${Math.max(8, cl)}%`, backgroundColor: drift ? c.blue : c.accent }]} /></View>
+              <Text style={[st.tieTxt, drift && { color: c.blue }]}>{tieLabel(cl, w)}</Text>
             </View>
 
             <View style={st.tags}>
@@ -109,6 +118,10 @@ const st: any = {
   name: { fontFamily: font.display, fontSize: 23, color: c.ink, letterSpacing: -0.7 },
   sub: { fontFamily: font.medium, fontSize: 13.5, color: c.muted, letterSpacing: -0.2, marginTop: 2 },
   x: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(23,19,52,0.06)" },
+  tie: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+  meterTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: "rgba(23,19,52,0.08)", overflow: "hidden" },
+  meterFill: { height: 7, borderRadius: 4 },
+  tieTxt: { fontFamily: font.bold, fontSize: 11.5, color: c.accent, letterSpacing: -0.1 },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 4 },
   tag: { borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 },
   tagTxt: { fontFamily: font.bold, fontSize: 12, color: "#fff", letterSpacing: -0.2 },

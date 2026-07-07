@@ -25,6 +25,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Line } from "react-native-svg";
 import Avatar from "./components/Avatar";
 import PersonSheet from "./components/PersonSheet";
+import { closeness, warmth, isDrifting } from "./lib/weight";
 import CaptureMoment from "./components/CaptureMoment";
 import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getSubscription, GraphPerson, loadSession, login, logout, Memory, Message, PromiseItem, registerDevice, setLocation, signup, simulate, subscribe, syncEmail } from "./lib/api";
 
@@ -828,8 +829,8 @@ function Float({ i, children }: { i: number; children: React.ReactNode }) {
 function PeopleView({ people, onRefresh, onAct, isPro, onUpgrade, onBrief, onSignOut }: { people: GraphPerson[]; promises: PromiseItem[]; onRefresh: () => Promise<void> | void; onAct: (t: string) => void; isPro: boolean; onUpgrade: () => void; onBrief: () => void; onSignOut: () => void }) {
   useEffect(() => { onRefresh(); }, []);
   const [sel, setSel] = useState<GraphPerson | null>(null);
-  const shown = people.slice(0, 8);
-  const need = people.filter((p) => { const b = daysUntilBirthday(p.birthday); return (b !== null && b <= 21) || !!(p.open_promises && p.open_promises.length); }).length;
+  const shown = [...people].sort((a, b) => closeness(b) - closeness(a)).slice(0, 8);
+  const need = people.filter((p) => { const b = daysUntilBirthday(p.birthday); return (b !== null && b <= 21) || !!(p.open_promises && p.open_promises.length) || isDrifting(p); }).length;
   const score = people.length ? Math.max(38, 98 - need * 7) : 100;
   const cx = 50, cy = 47;
   return (
@@ -848,7 +849,10 @@ function PeopleView({ people, onRefresh, onAct, isPro, onUpgrade, onBrief, onSig
         ) : (
           <>
             <Svg style={StyleSheet.absoluteFill as any} viewBox="0 0 100 100" preserveAspectRatio="none">
-              {shown.map((_, i) => <Line key={i} x1={cx} y1={cy} x2={SLOTS[i].x} y2={SLOTS[i].y} stroke="rgba(255,255,255,0.26)" strokeWidth={0.4} />)}
+              {shown.map((p, i) => {
+                const t = (0.13 + 0.22 * (closeness(p) / 100)) * (0.45 + 0.55 * warmth(p));
+                return <Line key={i} x1={cx} y1={cy} x2={SLOTS[i].x} y2={SLOTS[i].y} stroke={`rgba(255,255,255,${t.toFixed(3)})`} strokeWidth={0.28 + 0.5 * (closeness(p) / 100)} />;
+              })}
             </Svg>
             <View style={[cs.node, { left: `${cx}%`, top: `${cy}%`, marginLeft: -46, marginTop: -34 }]}>
               <View style={cs.youOrb}><Text style={cs.youTxt}>you</Text></View>
@@ -856,15 +860,16 @@ function PeopleView({ people, onRefresh, onAct, isPro, onUpgrade, onBrief, onSig
             {shown.map((p, i) => {
               const b = daysUntilBirthday(p.birthday); const bsoon = b !== null && b <= 21;
               const owes = !!(p.open_promises && p.open_promises.length);
-              const ring = bsoon ? c.pink : owes ? c.coral : c.mint;
-              const size = /family|partner/i.test(p.relation || "") ? 62 : 52;
-              const st = bsoon ? `🎂 ${b === 0 ? "today" : b + "d"}` : owes ? "you owe" : (p.relation || "");
+              const cl = closeness(p); const w = warmth(p); const drift = isDrifting(p);
+              const ring = bsoon ? c.pink : owes ? c.coral : drift ? c.blue : c.mint;
+              const size = Math.round(46 + (Math.min(cl, 92) / 92) * 26);
+              const st = bsoon ? `🎂 ${b === 0 ? "today" : b + "d"}` : owes ? "you owe" : drift ? "drifting" : (p.relation || "");
               return (
                 <View key={p.person} style={[cs.node, { left: `${SLOTS[i].x}%`, top: `${SLOTS[i].y}%`, marginLeft: -46, marginTop: -size / 2 }]}>
-                  <Press onPress={() => setSel(p)} style={{ alignItems: "center" }}>
-                    <Float i={i}><Avatar name={p.person} size={size} ring={ring} glow={bsoon} /></Float>
+                  <Press onPress={() => setSel(p)} style={{ alignItems: "center", opacity: 0.5 + 0.5 * w }}>
+                    <Float i={i}><Avatar name={p.person} size={size} ring={ring} glow={bsoon || (cl >= 52 && w >= 0.85)} /></Float>
                     <Text style={cs.nm} numberOfLines={1}>{p.person}</Text>
-                    {st ? <Text style={cs.st} numberOfLines={1}>{st}</Text> : null}
+                    {st ? <Text style={[cs.st, drift && { color: "#cfe6ff" }]} numberOfLines={1}>{st}</Text> : null}
                   </Press>
                 </View>
               );
@@ -876,6 +881,7 @@ function PeopleView({ people, onRefresh, onAct, isPro, onUpgrade, onBrief, onSig
         <View style={cs.lg}><View style={[cs.dot, { backgroundColor: c.mint }]} /><Text style={cs.lgTxt}>in touch</Text></View>
         <View style={cs.lg}><View style={[cs.dot, { backgroundColor: c.pink }]} /><Text style={cs.lgTxt}>birthday</Text></View>
         <View style={cs.lg}><View style={[cs.dot, { backgroundColor: c.coral }]} /><Text style={cs.lgTxt}>owed</Text></View>
+        <View style={cs.lg}><View style={[cs.dot, { backgroundColor: c.blue }]} /><Text style={cs.lgTxt}>drifting</Text></View>
       </View>
       <View style={cs.actions}>
         <Press style={cs.pillPrimary} onPress={onBrief}><Feather name="sun" size={15} color="#fff" /><Text style={cs.pillPrimaryTxt}>daily brief</Text></Press>
