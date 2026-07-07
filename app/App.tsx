@@ -25,7 +25,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Line } from "react-native-svg";
 import Avatar from "./components/Avatar";
 import PersonSheet from "./components/PersonSheet";
-import { closeness, warmth, isDrifting } from "./lib/weight";
+import { closeness, warmth, isDrifting, contactStats } from "./lib/weight";
 import CaptureMoment from "./components/CaptureMoment";
 import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getSubscription, GraphPerson, loadSession, login, logout, Memory, Message, PromiseItem, registerDevice, setLocation, signup, simulate, subscribe, syncEmail } from "./lib/api";
 
@@ -723,10 +723,13 @@ function HomeView({ promises, people, busy, onCapture, onDone, onBrief, onRecord
   }));
   // social connector: gently resurface people you've drifted from, so no one important goes quiet
   const surfaced = new Set([...cN, ...pN, ...bN].map((n) => String(n.person || "").toLowerCase()));
-  const rN = people.filter((p) => /family|friend|partner/i.test(p.relation || "") && !surfaced.has(String(p.person).toLowerCase()) && Number(p.updated_at) && (Date.now() - Number(p.updated_at)) >= 30 * 86400000)
-    .sort((a, b) => Number(a.updated_at) - Number(b.updated_at)).slice(0, 2).map((p) => {
-      const wk = Math.max(1, Math.round((Date.now() - Number(p.updated_at)) / (7 * 86400000)));
-      return { key: "r:" + p.person, person: p.person, title: `reconnect with ${p.person}`, body: `it's been ${wk} ${wk === 1 ? "week" : "weeks"} since you caught up`,
+  const rN = people.filter((p) => !surfaced.has(String(p.person).toLowerCase()) && isDrifting(p))
+    .sort((a, b) => warmth(a) - warmth(b)).slice(0, 2).map((p) => {
+      const st = contactStats(p);
+      const body = st.cadenceLabel
+        ? `you usually talk ${st.cadenceLabel}, last was ${st.lastLabel}`
+        : (st.overdueWeeks ? `it's been ${st.overdueWeeks} ${st.overdueWeeks === 1 ? "week" : "weeks"} since you caught up` : "you've gone quiet lately");
+      return { key: "r:" + p.person, person: p.person, title: `reconnect with ${p.person}`, body,
         chip: { label: p.relation || "reach out", bg: c.blue, fg: "#fff" }, ring: c.blue, glow: false, rank: 6, actBg: c.blue, icon: "message-circle",
         action: () => onCapture(`help me reconnect with ${p.person}, it's been a while. draft a warm, low pressure message to pick things back up.`) };
     });

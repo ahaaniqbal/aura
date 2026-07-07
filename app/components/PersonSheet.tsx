@@ -5,7 +5,7 @@ import { Feather } from "@expo/vector-icons";
 import Avatar from "./Avatar";
 import { c, font, shadow } from "../theme";
 import type { GraphPerson } from "../lib/api";
-import { closeness, warmth, tieLabel } from "../lib/weight";
+import { closeness, warmth, tieLabel, contactStats } from "../lib/weight";
 
 // The person detail. Tap a star in the constellation and the relationship opens up: who they
 // are, what they're carrying, what they want, and what you owe them, each with a way to act.
@@ -39,6 +39,8 @@ export default function PersonSheet({ person, onClose, onAct }: { person: GraphP
   const cl = p ? closeness(p) : 0;
   const w = p ? warmth(p) : 1;
   const drift = w < 0.5 && cl >= 34;
+  const stats = p ? contactStats(p) : null;
+  const cadence = stats ? [stats.cadenceLabel, stats.lastLabel && `last ${stats.lastLabel}`].filter(Boolean).join("  ·  ") : "";
   const ring = bsoon ? c.pink : promises.length ? c.coral : drift ? c.blue : c.mint;
 
   const run = (t: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); onClose(); onAct(t); };
@@ -67,6 +69,7 @@ export default function PersonSheet({ person, onClose, onAct }: { person: GraphP
               <View style={st.meterTrack}><View style={[st.meterFill, { width: `${Math.max(8, cl)}%`, backgroundColor: drift ? c.blue : c.accent }]} /></View>
               <Text style={[st.tieTxt, drift && { color: c.blue }]}>{tieLabel(cl, w)}</Text>
             </View>
+            {cadence ? <Text style={st.cadence}>{cadence}</Text> : null}
 
             <View style={st.tags}>
               {bsoon ? <View style={[st.tag, { backgroundColor: c.pink }]}><Text style={st.tagTxt}>🎂 {bd === 0 ? "today" : bd === 1 ? "tomorrow" : `${fmtBday(p.birthday)}, ${bd}d`}</Text></View> : null}
@@ -122,6 +125,7 @@ const st: any = {
   meterTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: "rgba(23,19,52,0.08)", overflow: "hidden" },
   meterFill: { height: 7, borderRadius: 4 },
   tieTxt: { fontFamily: font.bold, fontSize: 11.5, color: c.accent, letterSpacing: -0.1 },
+  cadence: { fontFamily: font.medium, fontSize: 12.5, color: c.muted, letterSpacing: -0.2, marginTop: -4, marginBottom: 12 },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 4 },
   tag: { borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 },
   tagTxt: { fontFamily: font.bold, fontSize: 12, color: "#fff", letterSpacing: -0.2 },
