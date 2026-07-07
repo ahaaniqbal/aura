@@ -154,6 +154,20 @@ export const getPulse = async (): Promise<Pulse> => {
 export const logPulse = (valence: number, mood: string) => post("pulse", { op: "log", valence, mood, source: "app" });
 // ambient capture: a conversation transcript -> people + promises + emotional weight -> graph + warm summary
 export const capture = (text: string) => post("capture", { text });
+// notepad: a quick captured thought -> parsed + filed + scheduled, with "here's what i caught" chips
+export type Chip = { label: string; tone: string };
+export type CaptureResult = { summary: string; chips: Chip[]; reminders: number; people: number; promises: number };
+export const captureThought = async (text: string): Promise<CaptureResult> => {
+  const d = await post("capture", { text, quick: true });
+  return { summary: d?.summary || "got it, i've remembered that.", chips: d?.chips || [], reminders: d?.reminders || 0, people: d?.people || 0, promises: d?.promises || 0 };
+};
+export type Reminder = { id: string; text: string; due_at: string; day: string | null; label: string; bucket: string };
+export type Remembered = { id: string; text: string; created_at: string };
+export const getRemember = async (): Promise<{ scheduled: Reminder[]; remembered: Remembered[] }> => {
+  try { const d = await post("remember", { op: "list" }); return { scheduled: d?.scheduled || [], remembered: d?.remembered || [] }; }
+  catch (e) { return { scheduled: [], remembered: [] }; }
+};
+export const rememberDone = (id: string) => post("remember", { op: "done", id });
 export const closePromise = (text: string) => post("graph", { op: "close_promise", text });
 export const registerDevice = (token: string, platform: string) => post("register_device", { token, platform });
 

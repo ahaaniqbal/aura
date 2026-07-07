@@ -1,9 +1,9 @@
-// Ambient capture, Aura's answer to Thine's moat. A moment from your life (a recorded
-// conversation, a call, a note) becomes structured relationship memory: people, promises,
-// and the emotional weight of what was said, so Aura can help you show up with care.
-// JWT-secured; extracts with the AI gateway and MERGEs into the Neo4j graph.
+// Ambient capture, Aura's answer to Thine's moat. A moment from your life OR a quick captured
+// thought becomes structured memory: people, promises, care, wants, dated reminders that
+// resurface on their day, and the user's own pulse. JWT-secured; extracts with the AI gateway,
+// MERGEs into Neo4j, and schedules reminders that the ambient loop fires.
 
-const SYSTEM = `you are aura's memory, warm and perceptive. you are given a real moment from someone's life, a conversation, a call, a dinner, and you extract what matters for their relationships. you notice not just facts but feeling: who is stressed, who is grieving, who is celebrating. all lowercase. never use em dashes or hyphens as punctuation; use commas or periods.`;
+const SYSTEM = `you are aura's memory, warm and perceptive. you are given a real moment from someone's life OR a quick thought they captured, and you extract what matters. you notice not just facts but feeling and intent: who they care about, what people want, what they need to be reminded of and when, and how they themselves are doing. all lowercase. never use em dashes or hyphens as punctuation; use commas or periods.`;
 
 function json(d: any, s = 200): Response {
   return new Response(JSON.stringify(d), { status: s, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
@@ -20,7 +20,7 @@ async function ai(apiUrl: string, appId: string, key: string, messages: any[]): 
     try {
       const r = await fetch(`${apiUrl}/v1/${appId}/chat/completions`, {
         method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
-        body: JSON.stringify({ model: "anthropic/claude-haiku-4.5", messages, max_tokens: 900, temperature: 0.5 }),
+        body: JSON.stringify({ model: "anthropic/claude-haiku-4.5", messages, max_tokens: 950, temperature: 0.5 }),
       });
       const d = await r.json();
       const content = d?.choices?.[0]?.message?.content;
@@ -29,6 +29,17 @@ async function ai(apiUrl: string, appId: string, key: string, messages: any[]): 
     } catch (e) { console.error("capture ai err", String(e)); }
   }
   return "";
+}
+const DOWN = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+function dayLabel(when: string, todayISO: string): string {
+  if (!when) return "";
+  const d = new Date(when + "T12:00:00Z"), t = new Date(todayISO + "T12:00:00Z");
+  const diff = Math.round((d.getTime() - t.getTime()) / 86400000);
+  if (diff <= 0) return "today";
+  if (diff === 1) return "tomorrow";
+  if (diff < 7) return DOWN[d.getUTCDay()];
+  const M = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  return `${M[d.getUTCMonth()]} ${d.getUTCDate()}`;
 }
 
 export default async function handler(req: Request, ctx: any): Promise<Response> {
@@ -40,6 +51,7 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
     const body = await req.json().catch(() => ({}));
     const text = (body.text || body.transcript || "").toString().trim();
     if (!text) return json({ error: "text required" }, 400);
+    const quick = !!body.quick; // a quick captured thought vs a full moment/transcript
     const { BUTTERBASE_APP_ID: APP, BUTTERBASE_API_URL: API, BUTTERBASE_API_KEY: KEY } = ctx.env;
 
     const graphOp = async (op: string, params: any) => {
@@ -53,12 +65,11 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
     };
 
     const NOW = new Date();
-    const DOW = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
     const todayStr = NOW.toISOString().slice(0, 10);
-    const dowStr = DOW[NOW.getUTCDay()];
+    const dowStr = DOWN[NOW.getUTCDay()];
 
-    const prompt = `here is a moment from the user's life. extract what matters for their relationship memory.
-for reference, today is ${dowStr}, ${todayStr}. resolve any relative date (today, tomorrow, this saturday, next week) into an absolute YYYY-MM-DD using that; never guess a date you cannot ground.
+    const prompt = `here is ${quick ? "a quick thought the user just captured" : "a moment from the user's life"}. extract what matters for their memory.
+for reference, today is ${dowStr}, ${todayStr}. resolve any relative date (today, tomorrow, this saturday, next week, in 3 days) into an absolute YYYY-MM-DD using that; never guess a date you cannot ground.
 """
 ${text.slice(0, 4500)}
 """
@@ -66,36 +77,58 @@ return STRICT json only, all lowercase, no em dashes:
 {
  "people":[{"name":str,"relation":"family"|"friend"|"client"|"collaborator"|"partner"|null,"note":str,"birthday":"MM-DD or null","wants":[str]}],
  "promises":[{"text":str,"person":str_or_null,"direction":"i_owe"|"owed_to_me"|null,"due":"YYYY-MM-DD, a weekday, or null"}],
+ "reminders":[{"text":str,"when":"YYYY-MM-DD or null"}],
  "care":[{"person":str,"note":str}],
  "self":{"valence":int,"mood":str,"note":str},
  "summary":str
 }
 notes:
-- "wants" is gift and preference memory: anything a person mentioned wanting, wishing for, loving, saving up for, or needing, a concrete thing you could later help get them. only include real, specific wants, else an empty array.
-- "care" is the emotional weight for other people: someone stressed, sick, grieving, moving, celebrating, anything the user should hold gently.
-- "self" is the USER'S OWN state, only if they clearly express how THEY are doing (not someone else). valence is -2 rough, -1 low, 0 ok, 1 good, 2 great; use null for valence if their own mood is not evident.
-- "summary" is one warm paragraph to the user: what you caught, and what matters, in aura's voice.
+- "reminders" are things to resurface to the user, a task, an errand, a note to self, an idea to revisit. "when" is the day it should come back (absolute YYYY-MM-DD), or null if it has no timing. a self-task ("remind me to...") is a reminder, not a promise.
+- "promises" are commitments to OTHER people, not tasks for yourself.
+- "wants" is gift and preference memory for a person. "care" is the emotional weight for other people (stress, grief, big changes), not neutral facts. "self" is the USER'S OWN state, only if evident (valence -2 rough..2 great, null if not).
+- "summary" is one warm sentence to the user, what you caught and what you'll do with it, in aura's voice.
 - if nothing relevant, use empty arrays and a short honest summary.`;
 
     const out = await ai(API, APP, KEY, [{ role: "system", content: SYSTEM }, { role: "user", content: prompt }]);
-    const parsed = parseJSON(out) || { people: [], promises: [], care: [], summary: "i listened, but nothing in there needs tracking right now." };
+    const parsed = parseJSON(out) || { people: [], promises: [], reminders: [], care: [], summary: "i listened, but nothing in there needs tracking right now." };
 
     const care: any[] = Array.isArray(parsed.care) ? parsed.care : [];
-    // fold each person's emotional context into their graph note, so future nudges lead with care
     const people = (Array.isArray(parsed.people) ? parsed.people : []).map((p: any) => {
       const cn = care.filter((c) => c.person && p.name && String(c.person).toLowerCase() === String(p.name).toLowerCase()).map((c) => c.note);
       return { ...p, birthday: p.birthday === "null" ? null : p.birthday, note: [p.note, ...cn].filter(Boolean).join(". "), care: cn.length ? cn.join(". ") : (p.care || null) };
     });
-    // anyone mentioned only in care still becomes a remembered person
     for (const c of care) {
       if (c.person && !people.some((p: any) => p.name && String(p.name).toLowerCase() === String(c.person).toLowerCase())) {
         people.push({ name: c.person, relation: null, note: c.note, birthday: null, care: c.note });
       }
     }
     const promises = Array.isArray(parsed.promises) ? parsed.promises : [];
-
     const g = await graphOp("ingest", { people, promises });
-    // if the user revealed their own state, record a pulse point (emotional pulse of the user)
+
+    // schedule dated reminders so they resurface on their day (auto_tick fires them, brief + notepad show them)
+    const reminders: any[] = Array.isArray(parsed.reminders) ? parsed.reminders : [];
+    const chips: { label: string; tone: string }[] = [];
+    let scheduled = 0;
+    for (const r of reminders) {
+      const rtext = (r?.text || "").toString().trim();
+      if (!rtext) continue;
+      const when = /^\d{4}-\d{2}-\d{2}$/.test(r?.when || "") ? r.when : null;
+      if (when) {
+        try {
+          await ctx.db.query(
+            "INSERT INTO actions (user_id, kind, title, payload, state) VALUES ($1,'reminder',$2,$3,'scheduled')",
+            [userId, rtext.slice(0, 120), JSON.stringify({ text: rtext, due_at: `${when}T09:00:00Z`, day: when, source: "capture" })]
+          );
+          scheduled++;
+          chips.push({ label: dayLabel(when, todayStr), tone: "date" });
+        } catch (e) { console.warn("reminder insert:", String(e)); }
+      } else {
+        chips.push({ label: "remembered", tone: "idea" });
+      }
+    }
+    for (const p of people) chips.push({ label: String(p.name).toLowerCase(), tone: (p.wants && p.wants.length) ? "gift" : "person" });
+    for (const pr of promises) chips.push({ label: "promise", tone: "promise" });
+
     const self = parsed.self;
     if (self && self.valence !== null && self.valence !== undefined && Number.isFinite(Number(self.valence))) {
       try {
@@ -104,10 +137,11 @@ notes:
           [userId, v, (self.mood || "").toString().slice(0, 40) || null, (self.note || "").toString().slice(0, 400) || null]);
       } catch (e) { console.warn("pulse insert:", String(e)); }
     }
-    const summary = (parsed.summary || "").toString().trim() || "got it, i've updated your memory.";
+
+    const summary = (parsed.summary || "").toString().trim() || "got it, i've remembered that.";
     const m = await ctx.db.query("INSERT INTO messages (user_id, role, content, kind) VALUES ($1,'aura',$2,'capture') RETURNING *", [userId, summary]);
 
-    return json({ ok: true, people: people.length, promises: promises.length, care: care.length, summary, graph: g, message: m.rows[0] });
+    return json({ ok: true, people: people.length, promises: promises.length, care: care.length, reminders: scheduled, chips, summary, graph: g, message: m.rows[0] });
   } catch (e: any) {
     console.error("capture error:", String(e));
     return json({ error: String(e) }, 500);

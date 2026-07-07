@@ -1,7 +1,7 @@
 // Aura's daily brief, the Pro habit loop. Composes a warm morning digest from the whole
-// relationship graph (care, birthdays + gift ideas, promises, and cadence-aware reconnects)
-// plus the user's own emotional pulse. Deterministic, grounded, no AI key needed. JWT-secured;
-// forwards the token to graph so it scopes to the signed-in user, and reads pulse for the user.
+// relationship graph (care, birthdays + gift ideas, promises, cadence reconnects), the user's
+// captured reminders due today, and their own emotional pulse. Deterministic, grounded, no AI
+// key. JWT-secured; forwards the token to graph, reads pulse + reminders for the user.
 
 function json(d: any, s = 200): Response {
   return new Response(JSON.stringify(d), { status: s, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
@@ -86,19 +86,28 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
     const people = gr?.nodes || [];
     const reflection = (pu?.reflection || "").toString().trim();
 
+    let dueReminders: any[] = [];
+    try {
+      const rr = await ctx.db.query("SELECT payload FROM actions WHERE user_id=$1 AND kind='reminder' AND state='scheduled' AND (payload->>'due_at')::timestamptz <= now() + interval '20 hours' ORDER BY (payload->>'due_at')::timestamptz ASC LIMIT 3", [userId]);
+      dueReminders = rr.rows || [];
+    } catch (e) { /* reminders are best-effort */ }
+
     const bdays = people.map((p: any) => ({ p, d: daysUntilBirthday(p.birthday) })).filter((x: any) => x.d !== null && x.d <= 14).sort((a: any, b: any) => a.d - b.d).slice(0, 2);
     const bdayNames = new Set(bdays.map((x: any) => String(x.p.person).toLowerCase()));
-    // people with a birthday coming up show under birthdays (more actionable), not twice
     const careP = people.filter((p: any) => p.care && p.care_at && (Date.now() - Number(p.care_at) < 30 * DAY) && !bdayNames.has(String(p.person).toLowerCase())).slice(0, 2);
     const surfaced = new Set([...careP.map((p: any) => p.person), ...bdays.map((x: any) => x.p.person)].map((s: string) => String(s).toLowerCase()));
-    const duePromises = promises.slice(0, 3);
+    // dedup: a self-task can get classified as both a reminder and a promise; never show it twice
+    const norm = (s: any) => String(s || "").toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+    const remTexts = dueReminders.map((r: any) => norm(r.payload?.text)).filter(Boolean);
+    const duePromises = promises.filter((p: any) => { const t = norm(p.text); return !remTexts.some((rt: string) => rt && (rt.includes(t) || t.includes(rt))); }).slice(0, 3);
     const drifting = people.filter((p: any) => !surfaced.has(String(p.person).toLowerCase()) && isDrifting(p))
       .sort((a: any, b: any) => (daysSince(b) || 0) - (daysSince(a) || 0)).slice(0, 1);
 
-    const items = careP.length + bdays.length + duePromises.length + drifting.length;
+    const items = dueReminders.length + careP.length + bdays.length + duePromises.length + drifting.length;
     const lines: string[] = [];
     lines.push(items ? "morning. here's who and what needs you today." : "morning.");
 
+    for (const r of dueReminders) { const t = (r.payload?.text || "").toString().trim(); if (t) lines.push(`${t}. you asked me to remind you.`); }
     for (const p of careP) lines.push(`${p.person} has been carrying something${p.care ? ` (${p.care})` : ""}. a good day to check in.`);
     for (const { p, d } of bdays) {
       const w = (p.wants || []).filter(Boolean);
@@ -119,14 +128,14 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
     if (reflection) lines.push(reflection);
 
     if (items === 0 && !reflection) {
-      lines.push(people.length ? `nothing pressing. a good day to reach out to someone you've gone quiet on.` : `nothing on your plate yet. tell me about someone you met and i'll start keeping the people and promises that matter.`);
+      lines.push(people.length ? `nothing pressing. a good day to reach out to someone you've gone quiet on.` : `nothing on your plate yet. tell me about someone you met, or just jot a thought, and i'll keep the things that matter.`);
     } else if (items > 0) {
       lines.push("want me to help with any of these?");
     }
 
     const brief = lines.join("\n");
     const m = await ctx.db.query("INSERT INTO messages (user_id, role, content, kind) VALUES ($1,'aura',$2,'brief') RETURNING *", [userId, brief]);
-    return json({ ok: true, brief, care: careP.length, birthdays: bdays.length, open_promises: promises.length, reconnect: drifting.length, people: people.length, message: m.rows[0] });
+    return json({ ok: true, brief, reminders: dueReminders.length, care: careP.length, birthdays: bdays.length, open_promises: promises.length, reconnect: drifting.length, people: people.length, message: m.rows[0] });
   } catch (e: any) {
     console.error("brief error:", String(e));
     return json({ error: String(e) }, 500);

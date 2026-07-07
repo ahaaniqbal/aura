@@ -28,7 +28,7 @@ import PersonSheet from "./components/PersonSheet";
 import PulseCard from "./components/PulseCard";
 import { closeness, warmth, isDrifting, contactStats } from "./lib/weight";
 import CaptureMoment from "./components/CaptureMoment";
-import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getPulse, getSubscription, GraphPerson, loadSession, login, logout, logPulse, Memory, Message, PromiseItem, Pulse, registerDevice, setLocation, setTimezone, signup, simulate, subscribe, syncEmail } from "./lib/api";
+import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getPulse, getSubscription, GraphPerson, loadSession, login, logout, logPulse, Memory, Message, PromiseItem, Pulse, registerDevice, setLocation, setTimezone, signup, simulate, subscribe, syncEmail, captureThought, CaptureResult, getRemember, rememberDone, Reminder, Remembered } from "./lib/api";
 
 const INPUT_LINE_H = 22;
 const INPUT_MAX_H = 120;
@@ -127,6 +127,14 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   const onPulse = useCallback(async (v: number, mood: string) => {
     try { await logPulse(v, mood); await loadPulse(); } catch (e) {}
   }, [loadPulse]);
+  const [remember, setRemember] = useState<{ scheduled: Reminder[]; remembered: Remembered[] }>({ scheduled: [], remembered: [] });
+  const loadRemember = useCallback(async () => { try { setRemember(await getRemember()); } catch (e) {} }, []);
+  const captureNote = useCallback(async (text: string): Promise<CaptureResult> => {
+    const r = await captureThought(text);
+    loadRemember(); refresh();
+    return r;
+  }, [loadRemember, refresh]);
+  const onRememberDone = useCallback(async (id: string) => { try { await rememberDone(id); await loadRemember(); } catch (e) {} }, [loadRemember]);
   // report the current device timezone (any IANA zone worldwide). re-run on foreground so travel updates it.
   const reportTimezone = useCallback(() => {
     try { const tz = Intl.DateTimeFormat().resolvedOptions().timeZone; if (tz) setTimezone(tz).catch(() => {}); } catch (e) {}
@@ -157,6 +165,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
     getConnections().then(setServerConnected).catch(() => {});
     loadGraph();
     loadPulse();
+    loadRemember();
     reportTimezone();
     (async () => {
       try {
@@ -186,6 +195,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   }, [tab, refresh]);
 
   useEffect(() => { if (tab === "people") loadGraph(); }, [tab, loadGraph]);
+  useEffect(() => { if (tab === "notes") loadRemember(); }, [tab, loadRemember]);
 
   useEffect(() => {
     if (tab === "chat") setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 120);
@@ -413,7 +423,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
       )}
 
       {tab === "people" && <PeopleView people={graph.people} promises={graph.promises} onRefresh={loadGraph} onAct={homeCapture} onAdd={() => setTab("today")} isPro={isPro} onUpgrade={() => setPayOpen(true)} onBrief={briefFlow} onSignOut={signOut} />}
-      {tab === "notes" && <NotesView notes={notes} onAdd={addNoteFlow} busy={busy} />}
+      {tab === "notes" && <NotesView onCapture={captureNote} data={remember} onDone={onRememberDone} onLoad={loadRemember} busy={busy} />}
       {tab === "connect" && <ConnectView serverConnected={serverConnected} onConnect={connectFlow} />}
 
       <View style={s.tabBar}>
@@ -641,45 +651,124 @@ function InlineCard({ card, onAct, busy }: { card: Card; onAct: (c: Card, d: "ap
   );
 }
 
-function NotesView({ notes, onAdd, busy }: { notes: Memory[]; onAdd: (t: string) => void; busy: boolean }) {
+const CHIP_TONE: Record<string, string> = { date: c.blue, person: c.pink, gift: c.pink, promise: c.coral, reminder: c.accent, idea: c.muted };
+const BUCKETS: { key: string; label: string }[] = [{ key: "today", label: "today" }, { key: "tomorrow", label: "tomorrow" }, { key: "week", label: "this week" }, { key: "later", label: "later" }];
+const BUCKET_COLOR: Record<string, string> = { today: c.accent, tomorrow: c.blue, week: c.mint, later: c.muted };
+
+// The capture screen. Not a notes app: a frictionless brain-dump that files itself and comes
+// back. Dump a thought, aura shows what it caught and when it'll return it, and the lists below
+// are your future self on a timeline (coming back to you) plus what got remembered.
+function NotesView({ onCapture, data, onDone, onLoad, busy }: { onCapture: (t: string) => Promise<CaptureResult>; data: { scheduled: Reminder[]; remembered: Remembered[] }; onDone: (id: string) => void; onLoad: () => void; busy: boolean }) {
   const [d, setD] = useState("");
-  const submit = () => { if (!d.trim()) return; onAdd(d); setD(""); };
+  const [caught, setCaught] = useState<CaptureResult | null>(null);
+  const [sending, setSending] = useState(false);
+  useEffect(() => { onLoad(); }, []);
+  const submit = async () => {
+    const t = d.trim(); if (!t || sending) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setSending(true);
+    try { const r = await onCapture(t); setCaught(r); setD(""); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); }
+    catch (e) {} finally { setSending(false); }
+  };
+  const scheduled = data.scheduled || [], remembered = data.remembered || [];
+  const hasAny = scheduled.length > 0 || remembered.length > 0;
   return (
     <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
-      <ScrollView style={s.fill} contentContainerStyle={s.pageScroll} keyboardShouldPersistTaps="handled">
-        <ScreenHeader title="notes" subtitle="anything you save becomes memory aura can recall later." />
-        <View style={s.notePage}>
-          <TextInput
-            style={s.notePageInput}
-            value={d}
-            onChangeText={setD}
-            placeholder="write a note…"
-            placeholderTextColor={c.muted}
-            multiline
-            textAlignVertical="top"
-          />
-          <View style={s.notePageFooter}>
-            <Text style={s.noteHint}>{d.trim() ? "tap save to add to memory" : "type or tap the mic"}</Text>
-            <View style={s.noteActions}>
-              <MicButton onResult={(t) => setD((p) => (p ? p + " " + t : t))} disabled={busy} size={layout.controlSm} />
-              <Press onPress={submit} disabled={!d.trim()} style={[s.saveBtn, !d.trim() && s.sendBtnOff]}>
-                {busy ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={s.saveTxt}>Save</Text>}
+      <ScrollView style={s.fill} contentContainerStyle={s.pageScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <Text style={ns.title}>capture</Text>
+        <Text style={ns.sub}>jot a thought. i'll file it and bring it back when it matters.</Text>
+        <View style={ns.composer}>
+          <TextInput style={ns.input} value={d} onChangeText={setD} placeholder="what's on your mind?" placeholderTextColor="#9a94bd" multiline textAlignVertical="top" />
+          <View style={ns.composerRow}>
+            <Text style={ns.hint} numberOfLines={1}>{d.trim() ? "i'll figure out what to do with it" : "type, or hold the mic"}</Text>
+            <View style={ns.composerActions}>
+              <MicButton onResult={(t) => setD((p) => (p ? p + " " + t : t))} disabled={sending} size={38} />
+              <Press onPress={submit} disabled={!d.trim() || sending} style={[ns.send, (!d.trim() || sending) && { opacity: 0.45 }]}>
+                {sending ? <ActivityIndicator color="#fff" size="small" /> : <Feather name="arrow-up" size={19} color="#fff" />}
               </Press>
             </View>
           </View>
         </View>
-        {notes.length > 0 ? <Text style={s.sectionLabel}>saved notes</Text> : null}
-        {notes.map((n) => (
-          <FadeInUp key={n.id}>
-            <View style={s.noteItem}>
-              <Text style={s.noteItemTxt}>{n.text}</Text>
+
+        {caught ? (
+          <FadeInUp>
+            <View style={ns.caught}>
+              <View style={ns.caughtHead}>
+                <View style={ns.caughtDot}><Feather name="check" size={13} color="#fff" /></View>
+                <Text style={ns.caughtLabel}>here's what i caught</Text>
+                <Press onPress={() => setCaught(null)} hitSlop={8} style={{ marginLeft: "auto" }}><Feather name="x" size={16} color={c.muted} /></Press>
+              </View>
+              <Text style={ns.caughtTxt}>{caught.summary}</Text>
+              {caught.chips.length ? <View style={ns.chips}>{caught.chips.map((cp, i) => <View key={i} style={[ns.chip, { backgroundColor: CHIP_TONE[cp.tone] || c.muted }]}><Text style={ns.chipTxt}>{cp.label}</Text></View>)}</View> : null}
             </View>
           </FadeInUp>
-        ))}
+        ) : null}
+
+        {scheduled.length ? (
+          <>
+            <Text style={ns.section}>coming back to you</Text>
+            {BUCKETS.map((b) => {
+              const items = scheduled.filter((x) => x.bucket === b.key);
+              if (!items.length) return null;
+              return (
+                <View key={b.key}>
+                  <Text style={ns.group}>{b.label}</Text>
+                  {items.map((r) => (
+                    <View key={r.id} style={ns.rem}>
+                      <View style={[ns.remDay, { backgroundColor: BUCKET_COLOR[r.bucket] || c.muted }]}><Text style={ns.remDayTxt}>{r.label}</Text></View>
+                      <Text style={ns.remTxt} numberOfLines={2}>{r.text}</Text>
+                      <Press onPress={() => onDone(r.id)} hitSlop={6} style={ns.remCheck}><Feather name="check" size={16} color={c.mint} /></Press>
+                    </View>
+                  ))}
+                </View>
+              );
+            })}
+          </>
+        ) : null}
+
+        {remembered.length ? (
+          <>
+            <Text style={ns.section}>remembered</Text>
+            {remembered.map((m) => (<View key={m.id} style={ns.memo}><Text style={ns.memoTxt}>{m.text}</Text></View>))}
+          </>
+        ) : null}
+
+        {!hasAny && !caught ? (
+          <View style={ns.empty}><Feather name="feather" size={24} color={c.muted} /><Text style={ns.emptyTxt}>nothing captured yet. dump a thought above, a task, an idea, someone you met, and i'll keep it and bring it back at the right time.</Text></View>
+        ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
+const ns = StyleSheet.create({
+  title: { fontFamily: font.display, fontSize: 30, color: c.ink, letterSpacing: -0.9, marginTop: 4 },
+  sub: { fontFamily: font.medium, fontSize: 15, color: c.muted, letterSpacing: -0.2, marginTop: 3, marginBottom: 16, lineHeight: 21 },
+  composer: { backgroundColor: "#fff", borderRadius: 24, padding: 16, ...shadow.card },
+  input: { fontFamily: font.medium, fontSize: 17, lineHeight: 24, color: c.ink, letterSpacing: -0.2, minHeight: 72, padding: 0 },
+  composerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(23,19,52,0.08)" },
+  hint: { fontFamily: font.medium, fontSize: 12.5, color: c.muted, letterSpacing: -0.2, flex: 1 },
+  composerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  send: { width: 44, height: 44, borderRadius: 22, backgroundColor: c.accent, alignItems: "center", justifyContent: "center", borderWidth: 2.5, borderColor: "#fff", ...shadow.puff },
+  caught: { backgroundColor: "#fff", borderRadius: 22, padding: 16, marginTop: 14, borderWidth: 2, borderColor: "rgba(31,208,160,0.3)", ...shadow.card },
+  caughtHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  caughtDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: c.mint, alignItems: "center", justifyContent: "center" },
+  caughtLabel: { fontFamily: font.bold, fontSize: 12.5, color: c.mint, letterSpacing: -0.2 },
+  caughtTxt: { fontFamily: font.medium, fontSize: 15.5, lineHeight: 23, color: c.ink, letterSpacing: -0.2 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 12 },
+  chip: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 2, borderColor: "#fff", ...shadow.soft },
+  chipTxt: { fontFamily: font.bold, fontSize: 12.5, color: "#fff", letterSpacing: -0.2 },
+  section: { fontFamily: font.display, fontSize: 17, color: c.ink, letterSpacing: -0.5, marginTop: 24, marginBottom: 10 },
+  group: { fontFamily: font.bold, fontSize: 12, color: c.muted, letterSpacing: -0.1, marginTop: 8, marginBottom: 7, marginLeft: 2 },
+  rem: { flexDirection: "row", alignItems: "center", gap: 11, backgroundColor: "#fff", borderRadius: 18, padding: 12, marginBottom: 8, ...shadow.soft },
+  remDay: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, minWidth: 54, alignItems: "center" },
+  remDayTxt: { fontFamily: font.bold, fontSize: 11.5, color: "#fff", letterSpacing: -0.2 },
+  remTxt: { fontFamily: font.medium, fontSize: 15, lineHeight: 20, color: c.ink, letterSpacing: -0.2, flex: 1 },
+  remCheck: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(31,208,160,0.12)" },
+  memo: { backgroundColor: "#fff", borderRadius: 16, padding: 13, marginBottom: 8, ...shadow.soft },
+  memoTxt: { fontFamily: font.medium, fontSize: 14.5, lineHeight: 21, color: c.ink, letterSpacing: -0.2 },
+  empty: { alignItems: "center", gap: 12, paddingVertical: 40, paddingHorizontal: 20 },
+  emptyTxt: { fontFamily: font.medium, fontSize: 15, color: c.muted, textAlign: "center", letterSpacing: -0.2, lineHeight: 22 },
+});
 
 function ConnectView({ serverConnected, onConnect }: { serverConnected: string[]; onConnect: (slug: string) => void }) {
   const connected = TOOLS.filter((t) => t.slug && serverConnected.includes(t.slug)).length;
