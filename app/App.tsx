@@ -709,7 +709,12 @@ function HomeView({ promises, people, busy, onCapture, onDone, onBrief, onRecord
     return { key: "b:" + p.person, person: p.person, title: `${p.person}'s birthday`, body: p.relation ? `your ${p.relation}` : "coming up",
       chip: { label, bg: c.pink, fg: "#fff" }, ring: c.pink, glow: true, rank: days, actBg: c.pink, icon: "gift", action: () => onCapture(`help me send a warm birthday message to ${p.person}`) };
   });
-  const nudges = [...pN, ...bN].sort((a, b) => a.rank - b.rank).slice(0, 6);
+  const cN = people.filter((p) => p.care && p.care_at && (Date.now() - Number(p.care_at) < 30 * 86400000)).slice(0, 3).map((p) => ({
+    key: "c:" + p.person, person: p.person, title: `check in on ${p.person}`, body: String(p.care || ""),
+    chip: { label: "needs you", bg: c.pink, fg: "#fff" }, ring: c.pink, glow: true, rank: -12,
+    actBg: c.pink, icon: "heart", action: () => onCapture(`help me reach out warmly to ${p.person}. what's going on: ${p.care}`),
+  }));
+  const nudges = [...cN, ...pN, ...bN].sort((a, b) => a.rank - b.rank).slice(0, 6);
   return (
     <View style={s.fill}>
       <LinearGradient colors={grad.today as any} locations={[0, 0.34, 0.64]} style={StyleSheet.absoluteFill} />

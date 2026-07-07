@@ -75,12 +75,12 @@ notes:
     // fold each person's emotional context into their graph note, so future nudges lead with care
     const people = (Array.isArray(parsed.people) ? parsed.people : []).map((p: any) => {
       const cn = care.filter((c) => c.person && p.name && String(c.person).toLowerCase() === String(p.name).toLowerCase()).map((c) => c.note);
-      return { ...p, birthday: p.birthday === "null" ? null : p.birthday, note: [p.note, ...cn].filter(Boolean).join(". ") };
+      return { ...p, birthday: p.birthday === "null" ? null : p.birthday, note: [p.note, ...cn].filter(Boolean).join(". "), care: cn.length ? cn.join(". ") : (p.care || null) };
     });
     // anyone mentioned only in care still becomes a remembered person
     for (const c of care) {
       if (c.person && !people.some((p: any) => p.name && String(p.name).toLowerCase() === String(c.person).toLowerCase())) {
-        people.push({ name: c.person, relation: null, note: c.note, birthday: null });
+        people.push({ name: c.person, relation: null, note: c.note, birthday: null, care: c.note });
       }
     }
     const promises = Array.isArray(parsed.promises) ? parsed.promises : [];

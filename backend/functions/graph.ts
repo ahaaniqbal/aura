@@ -1,7 +1,3 @@
-// Aura's relationship graph, backed by Neo4j (HackwithBay 3.0 mandatory tech).
-// JWT-secured: ctx.user.id scopes the whole graph. Talks to Neo4j Aura over the
-// HTTP Query API v2 (no bolt driver in the worker runtime).
-
 function json(d: any, s = 200): Response {
   return new Response(JSON.stringify(d), { status: s, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
 }
@@ -47,6 +43,8 @@ SET person.note = coalesce(p.note, person.note),
     person.org = coalesce(p.org, person.org),
     person.birthday = coalesce(p.birthday, person.birthday),
     person.relation = coalesce(p.relation, person.relation),
+    person.care = coalesce(p.care, person.care),
+    person.care_at = CASE WHEN p.care IS NOT NULL AND p.care <> '' THEN timestamp() ELSE person.care_at END,
     person.updated_at = timestamp()
 MERGE (u)-[:KNOWS]->(person)
 FOREACH (topic IN coalesce(p.topics, []) |
@@ -86,7 +84,7 @@ WHERE toLower(p.name) CONTAINS toLower($q)
    OR EXISTS { MATCH (p)-[:INTERESTED_IN]->(t:Topic) WHERE toLower(t.name) CONTAINS toLower($q) }
 OPTIONAL MATCH (p)-[:INTERESTED_IN]->(t:Topic)
 OPTIONAL MATCH (pr:Promise)-[:TO]->(p) WHERE pr.status = 'open'
-RETURN p.name AS name, p.note AS note, p.org AS org, p.relation AS relation, p.birthday AS birthday,
+RETURN p.name AS name, p.note AS note, p.org AS org, p.relation AS relation, p.birthday AS birthday, p.care AS care,
        collect(DISTINCT t.name) AS topics, collect(DISTINCT pr.text) AS open_promises
 LIMIT 12`;
 
@@ -112,7 +110,7 @@ const Q_SUBGRAPH = `
 MATCH (u:User {id:$uid})-[:KNOWS]->(p:Person)
 OPTIONAL MATCH (p)-[:INTERESTED_IN]->(t:Topic)
 OPTIONAL MATCH (u)-[:MADE]->(pr:Promise)-[:TO]->(p) WHERE pr.status = 'open'
-RETURN p.name AS person, p.org AS org, p.relation AS relation, p.birthday AS birthday,
+RETURN p.name AS person, p.org AS org, p.relation AS relation, p.birthday AS birthday, p.care AS care, p.care_at AS care_at,
        collect(DISTINCT t.name) AS topics, collect(DISTINCT pr.text) AS open_promises
 LIMIT 200`;
 
