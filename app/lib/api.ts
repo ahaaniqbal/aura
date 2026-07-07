@@ -143,6 +143,7 @@ export const getGraph = async (): Promise<{ people: GraphPerson[]; promises: Pro
   } catch (e) { return { people: [], promises: [] }; }
 };
 export const getBrief = () => post("brief", {});
+export const closePromise = (text: string) => post("graph", { op: "close_promise", text });
 
 // ---------------- payments (Butterbase Stripe Connect) ----------------
 const BILLING = `https://api.butterbase.ai/v1/${APP}/billing`;

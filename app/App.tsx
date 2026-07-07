@@ -22,7 +22,7 @@ import BrandIcon from "./components/BrandIcon";
 import MicButton from "./components/MicButton";
 import Onboarding from "./components/Onboarding";
 import { c, font, layout, r, shadow, sp, type as ty } from "./theme";
-import { addNote, agent, approve, Card, clearChat, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getSubscription, GraphPerson, loadSession, login, logout, Memory, Message, PromiseItem, setLocation, signup, simulate, subscribe, syncEmail } from "./lib/api";
+import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getSubscription, GraphPerson, loadSession, login, logout, Memory, Message, PromiseItem, setLocation, signup, simulate, subscribe, syncEmail } from "./lib/api";
 
 const INPUT_LINE_H = 22;
 const INPUT_MAX_H = 120;
@@ -43,6 +43,7 @@ const STARTERS = [
 ];
 
 const TABS = [
+  { key: "today" as const, icon: "sun", label: "Today" },
   { key: "chat" as const, icon: "message-circle", label: "Chat" },
   { key: "people" as const, icon: "users", label: "People" },
   { key: "notes" as const, icon: "edit-3", label: "Notes" },
@@ -63,7 +64,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
     Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
   });
   const [feed, setFeed] = useState<Feed | null>(null);
-  const [tab, setTab] = useState<"chat" | "people" | "notes" | "connect">("chat");
+  const [tab, setTab] = useState<"today" | "chat" | "people" | "notes" | "connect">("today");
   const [draft, setDraft] = useState("");
   const [inputH, setInputH] = useState(INPUT_LINE_H);
   const [busy, setBusy] = useState(false);
@@ -154,6 +155,16 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
     setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 60);
     try { await agent(t); await refresh(); loadGraph(); }
     finally { sendingRef.current = false; setPending((p) => p.filter((x) => x.id !== tempId)); setThinking(false); setBusy(false); }
+  };
+  const homeCapture = async (text: string) => {
+    const t = text.trim(); if (!t) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setBusy(true);
+    try { await agent(t, "home"); await refresh(); await loadGraph(); } finally { setBusy(false); }
+  };
+  const donePromise = async (text: string) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    try { await closePromise(text); await loadGraph(); } catch (e) {}
   };
   const act = async (card: Card, decision: "approve" | "decline") => {
     if (!card.action_id) return;
@@ -279,6 +290,8 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
           </Press>
         </View>
       </View>
+
+      {tab === "today" && <HomeView promises={graph.promises} people={graph.people} busy={busy} onCapture={homeCapture} onDone={donePromise} onBrief={briefFlow} />}
 
       {tab === "chat" && (
         <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
@@ -619,6 +632,88 @@ function ConnectView({ serverConnected, onConnect }: { serverConnected: string[]
         );
       })}
     </ScrollView>
+  );
+}
+
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "good morning";
+  if (h < 18) return "good afternoon";
+  return "good evening";
+}
+const MM = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+function dueMeta(due: string | null): { label: string; tone: "over" | "soon" | "later"; rank: number } | null {
+  if (!due) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(due);
+  if (!m) return { label: due, tone: "later", rank: 9000 };
+  const d = new Date(+m[1], +m[2] - 1, +m[3]); d.setHours(0, 0, 0, 0);
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const days = Math.round((d.getTime() - now.getTime()) / 86400000);
+  const nice = `${MM[+m[2] - 1]} ${+m[3]}`;
+  if (days < 0) return { label: "overdue", tone: "over", rank: days };
+  if (days === 0) return { label: "today", tone: "over", rank: 0 };
+  if (days === 1) return { label: "tomorrow", tone: "soon", rank: 1 };
+  if (days <= 4) return { label: `in ${days} days`, tone: "soon", rank: days };
+  return { label: nice, tone: "later", rank: days };
+}
+
+function HomeView({ promises, people, busy, onCapture, onDone, onBrief }: { promises: PromiseItem[]; people: GraphPerson[]; busy: boolean; onCapture: (t: string) => void; onDone: (text: string) => void; onBrief: () => void }) {
+  const [q, setQ] = useState("");
+  const submit = () => { if (!q.trim()) return; onCapture(q); setQ(""); };
+  const nudges = promises
+    .map((p) => ({ p, meta: dueMeta(p.due) }))
+    .sort((a, b) => (a.meta?.rank ?? 9999) - (b.meta?.rank ?? 9999))
+    .slice(0, 6);
+  return (
+    <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
+      <ScrollView style={s.fill} contentContainerStyle={s.pageScroll} keyboardShouldPersistTaps="handled">
+        <View style={s.homeHead}>
+          <Text style={s.homeGreet}>{greeting()}.</Text>
+          <Text style={s.homeSub}>{promises.length ? "here's who needs you today." : `you're keeping track of ${people.length} ${people.length === 1 ? "person" : "people"}.`}</Text>
+        </View>
+
+        <View style={s.homeCapture}>
+          <TextInput style={s.homeCaptureInput} value={q} onChangeText={setQ} placeholder="tell aura anything, a person, a promise, a plan…" placeholderTextColor={c.muted} multiline />
+          <View style={s.homeCaptureRow}>
+            <MicButton onResult={(t) => setQ((d) => (d ? d + " " + t : t))} disabled={busy} size={layout.controlSm} />
+            <Press onPress={submit} disabled={!q.trim() || busy} style={[s.homeCaptureBtn, !q.trim() && s.sendBtnOff]}>
+              {busy ? <ActivityIndicator color="#FFF" size="small" /> : <Feather name="arrow-up" size={18} color={q.trim() ? "#FFF" : c.muted} />}
+            </Press>
+          </View>
+        </View>
+
+        {nudges.length ? (
+          <>
+            <View style={s.homeSectionRow}>
+              <Text style={s.sectionLabel}>Who needs you</Text>
+              <Press onPress={onBrief} hitSlop={8}><Text style={s.homeBriefLink}>daily brief</Text></Press>
+            </View>
+            {nudges.map(({ p, meta }, i) => (
+              <FadeInUp key={i}>
+                <View style={s.nudge}>
+                  <View style={s.nudgeAvatar}><Text style={s.nudgeInitial}>{(p.person || "?").trim().charAt(0).toUpperCase()}</Text></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.nudgeTitle}>{p.direction === "owed_to_me" ? `${p.person || "someone"} owes you` : `for ${p.person || "someone"}`}</Text>
+                    <Text style={s.nudgeBody}>{p.text}</Text>
+                    {meta ? (
+                      <View style={[s.nudgeChip, meta.tone === "over" && s.nudgeChipOver, meta.tone === "soon" && s.nudgeChipSoon]}>
+                        <Text style={[s.nudgeChipTxt, meta.tone === "over" && s.nudgeChipTxtOver, meta.tone === "soon" && s.nudgeChipTxtSoon]}>{meta.label}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Press onPress={() => onDone(p.text)} hitSlop={8} style={s.nudgeDone}><Feather name="check" size={18} color={c.success} /></Press>
+                </View>
+              </FadeInUp>
+            ))}
+          </>
+        ) : (
+          <View style={s.homeEmpty}>
+            <Orb size={64} state="idle" />
+            <Text style={s.homeEmptyTxt}>nothing needs you right now. tell me about someone you met, or a promise you made, and i'll keep watch.</Text>
+          </View>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -1076,6 +1171,30 @@ const s = StyleSheet.create({
   briefBtnTxt: { fontFamily: font.semibold, fontSize: ty.body, color: "#FFF" },
   signOut: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: sp.l, marginTop: sp.s },
   signOutTxt: { fontFamily: font.medium, fontSize: ty.subhead, color: c.muted },
+
+  homeHead: { marginBottom: sp.l },
+  homeGreet: { fontFamily: font.display, fontSize: ty.hero, color: c.text, letterSpacing: -0.5, lineHeight: 36 },
+  homeSub: { fontFamily: font.body, fontSize: ty.subhead, color: c.muted, lineHeight: 22, marginTop: 4 },
+  homeCapture: { backgroundColor: c.surface, borderRadius: r.card, borderWidth: StyleSheet.hairlineWidth, borderColor: c.hairline, padding: sp.m + 2, marginBottom: sp.l, ...shadow.soft },
+  homeCaptureInput: { fontFamily: font.body, fontSize: ty.body, lineHeight: 22, color: c.text, minHeight: 44, padding: 0 },
+  homeCaptureRow: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: sp.s, marginTop: sp.s },
+  homeCaptureBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: c.accent, alignItems: "center", justifyContent: "center" },
+  homeSectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  homeBriefLink: { fontFamily: font.semibold, fontSize: ty.caption, color: c.accent },
+  nudge: { flexDirection: "row", alignItems: "center", gap: sp.m, backgroundColor: c.surface, borderRadius: r.card, borderWidth: StyleSheet.hairlineWidth, borderColor: c.hairline, padding: sp.m + 2, marginBottom: sp.s, ...shadow.soft },
+  nudgeAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: c.accentSoft, alignItems: "center", justifyContent: "center" },
+  nudgeInitial: { fontFamily: font.display, fontSize: 18, color: c.accent },
+  nudgeTitle: { fontFamily: font.medium, fontSize: ty.caption, color: c.muted, lineHeight: 16 },
+  nudgeBody: { fontFamily: font.semibold, fontSize: ty.subhead, color: c.text, lineHeight: 20, marginTop: 1 },
+  nudgeChip: { alignSelf: "flex-start", backgroundColor: c.chipBg, paddingHorizontal: sp.s, paddingVertical: 2, borderRadius: r.chip, marginTop: 6 },
+  nudgeChipOver: { backgroundColor: "rgba(201,110,104,0.14)" },
+  nudgeChipSoon: { backgroundColor: c.accentSoft },
+  nudgeChipTxt: { fontFamily: font.semibold, fontSize: ty.micro, color: c.muted, letterSpacing: 0.2 },
+  nudgeChipTxtOver: { color: "#C96E68" },
+  nudgeChipTxtSoon: { color: c.accent },
+  nudgeDone: { width: 34, height: 34, borderRadius: 17, borderWidth: StyleSheet.hairlineWidth, borderColor: c.hairline, backgroundColor: c.bg, alignItems: "center", justifyContent: "center" },
+  homeEmpty: { alignItems: "center", gap: sp.m, paddingVertical: sp.xl, paddingHorizontal: sp.l },
+  homeEmptyTxt: { fontFamily: font.body, fontSize: ty.subhead, color: c.muted, textAlign: "center", lineHeight: 22 },
 
   payHeader: { flexDirection: "row", alignItems: "center", gap: sp.s, marginBottom: sp.s },
   payTitle: { fontFamily: font.display, fontSize: ty.h1, color: c.text, letterSpacing: -0.4 },
