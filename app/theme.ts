@@ -1,40 +1,70 @@
 // Aura design system — warm cream + pastel aura, editorial type.
-// Grounded in references (Outseta type, Liven/Tolan orb, mymind/Perplexity restraint).
 export const c = {
-  bg: "#FBF7F0",        // warm cream
-  surface: "#FFFDFA",   // near-white card
-  surfaceAlt: "#F5EEE4",
-  text: "#2C2724",      // warm charcoal
-  muted: "#8A817A",     // taupe
-  hairline: "#ECE4D8",
-  // pastel accents
+  bg: "#FBF7F0",
+  surface: "#FFFDFA",
+  surfaceAlt: "#F3EBE0",
+  text: "#2C2724",
+  muted: "#7A726A",
+  hairline: "#E5DDD2",
   lavender: "#C9B8F0",
   blush: "#F7C5C0",
   mint: "#B9E3CB",
   sky: "#BCD7F2",
   peach: "#F6CDA8",
-  // derived / actionable
-  userBubble: "#EDE6FB",   // lavender tint
+  userBubble: "#E8E0F8",
   chipBg: "#EFE9FB",
-  mintBtn: "#B9E3CB",
-  text2: "#FBF7F0",
-  accent: "#6C5CB0",       // deep lavender, primary CTA
-  accentPressed: "#5F4FA0",
+  accent: "#6C5CB0",
+  accentSoft: "#EDE8F8",
+  accentMuted: "rgba(108, 92, 176, 0.12)",
+  success: "#4A9468",
+  successSoft: "#E8F5EE",
+  danger: "#C96E68",
+  dangerSoft: "#FDF0EF",
+  urgentBg: "#FFF6F4",
+  urgentBorder: "#F0B8B0",
+  overlay: "rgba(28, 24, 20, 0.44)",
+  recording: "#F3CFCF",
+  recordingBorder: "#E29A9A",
+  recordingIcon: "#9B2C2C",
 };
 
-// orb gradient stops per mood (3-stop ~135deg)
 export const orb = {
   idle: ["#C9B8F0", "#BCD7F2", "#B9E3CB"],
   thinking: ["#C9B8F0", "#D9B8E8", "#F7C5C0"],
   warm: ["#F7C5C0", "#F6CDA8", "#F3D9A0"],
 } as const;
 
-export const sp = { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, h: 32, xh: 48 };
-export const r = { chip: 999, button: 14, bubble: 20, card: 22, sheet: 26, input: 22, tile: 14 };
+export const sp = { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, h: 32, xh: 40 };
+export const layout = { page: 20, control: 44, controlSm: 36 };
+
+export const r = {
+  chip: 999,
+  button: 12,
+  bubble: 18,
+  bubbleTail: 4,
+  card: 16,
+  sheet: 24,
+  input: 14,
+  tab: 12,
+  tool: 14,
+  toolTile: 10,
+};
 
 export const shadow = {
-  card: { shadowColor: "#5B4A37", shadowOpacity: 0.1, shadowRadius: 24, shadowOffset: { width: 0, height: 14 }, elevation: 5 },
-  soft: { shadowColor: "#5B4A37", shadowOpacity: 0.05, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2 },
+  card: {
+    shadowColor: "#3D3228",
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  soft: {
+    shadowColor: "#3D3228",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
 };
 
 export const font = {
@@ -48,12 +78,12 @@ export const font = {
 };
 
 export const type = {
-  hero: 34,
-  h1: 28,
-  h2: 22,
-  title: 18,
+  hero: 30,
+  h1: 26,
+  h2: 20,
+  title: 17,
   body: 16,
   subhead: 15,
   caption: 13,
-  micro: 11.5,
+  micro: 11,
 };

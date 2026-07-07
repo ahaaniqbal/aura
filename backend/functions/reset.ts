@@ -2,8 +2,9 @@ function json(d: any, s = 200): Response { return new Response(JSON.stringify(d)
 export default async function handler(req: Request, ctx: any): Promise<Response> {
   if (req.method === "OPTIONS") return json({ ok: true });
   try {
+    const userId = ctx.user?.id;
+    if (!userId) return json({ error: "unauthorized" }, 401);
     const body = await req.json().catch(() => ({}));
-    const userId = body.user_id || "demo";
     const keepMemories = !!body.keep_memories;
     await ctx.db.query("DELETE FROM messages WHERE user_id=$1", [userId]);
     await ctx.db.query("DELETE FROM cards WHERE user_id=$1", [userId]);

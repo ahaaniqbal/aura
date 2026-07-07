@@ -29,8 +29,9 @@ function automated(sender: string): boolean { return /no-?reply|do-?not-?reply|n
 export default async function handler(req: Request, ctx: any): Promise<Response> {
   if (req.method === "OPTIONS") return json({ ok: true });
   try {
+    const userId = ctx.user?.id;
+    if (!userId) return json({ error: "unauthorized" }, 401);
     const body = await req.json().catch(() => ({}));
-    const userId = body.user_id || "demo";
     const silent = !!body.silent;
     const { BUTTERBASE_APP_ID, BUTTERBASE_API_URL, BUTTERBASE_API_KEY } = ctx.env;
 

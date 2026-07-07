@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator, Alert, Animated, Dimensions, Easing, KeyboardAvoidingView, LayoutAnimation, Modal, PanResponder, Platform, Pressable,
-  SafeAreaView, ScrollView, StyleSheet, Text, TextInput, UIManager, View,
+  RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, UIManager, View,
 } from "react-native";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -20,9 +20,11 @@ import { Feather } from "@expo/vector-icons";
 import Orb from "./components/Orb";
 import BrandIcon from "./components/BrandIcon";
 import MicButton from "./components/MicButton";
-import { c, font, r, shadow, sp, type as ty } from "./theme";
-import { addNote, approve, capture, Card, clearChat, connect, Feed, getConnections, getFeed, Memory, Message, setLocation, simulate, syncEmail } from "./lib/api";
+import { c, font, layout, r, shadow, sp, type as ty } from "./theme";
+import { addNote, agent, approve, Card, clearChat, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getSubscription, GraphPerson, loadSession, login, logout, Memory, Message, PromiseItem, setLocation, signup, simulate, subscribe, syncEmail } from "./lib/api";
 
+const INPUT_LINE_H = 22;
+const INPUT_MAX_H = 120;
 const SCREEN_W = Dimensions.get("window").width;
 const SWIPE_THRESH = 100;
 
@@ -33,26 +35,43 @@ Notifications.setNotificationHandler({
   } as any),
 });
 
-const TOOLS = [
-  { key: "gmail", slug: "gmail", brand: "gmail", label: "Gmail", icon: "mail", sub: "drafts replies in your voice" },
-  { key: "gcal", slug: "google-calendar", brand: "googlecalendar", label: "Calendar", icon: "calendar", sub: "knows when you're free" },
-  { key: "notion", slug: "notion", brand: "notion", label: "Notion", icon: "file-text", sub: "your notes and docs" },
-  { key: "slack", slug: "slack", brand: "slack", label: "Slack", icon: "slack", sub: "catches what matters" },
-  { key: "whatsapp", slug: "", brand: "whatsapp", label: "WhatsApp", icon: "message-circle", sub: "messages and threads" },
-  { key: "bank", slug: "", brand: "", label: "Bank and cards", icon: "credit-card", sub: "pays, with your ok" },
+const STARTERS = [
+  "Remember Sarah loves tulips",
+  "What's on my calendar today?",
+  "Check my inbox for anything urgent",
 ];
 
-export default function App() {
+const TABS = [
+  { key: "chat" as const, icon: "message-circle", label: "Chat" },
+  { key: "people" as const, icon: "users", label: "People" },
+  { key: "notes" as const, icon: "edit-3", label: "Notes" },
+  { key: "connect" as const, icon: "link", label: "Connect" },
+];
+const TOOLS = [
+  { key: "gmail", slug: "gmail", brand: "gmail", label: "Gmail", icon: "mail", sub: "Drafts replies in your voice" },
+  { key: "gcal", slug: "google-calendar", brand: "googlecalendar", label: "Calendar", icon: "calendar", sub: "Knows when you're free" },
+  { key: "notion", slug: "notion", brand: "notion", label: "Notion", icon: "file-text", sub: "Your notes and docs" },
+  { key: "slack", slug: "slack", brand: "slack", label: "Slack", icon: "slack", sub: "Catches what matters" },
+  { key: "whatsapp", slug: "", brand: "whatsapp", label: "WhatsApp", icon: "message-circle", sub: "Messages and threads" },
+  { key: "bank", slug: "", brand: "", label: "Bank and cards", icon: "credit-card", sub: "Pays, with your OK" },
+];
+
+function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   const [loaded] = useFonts({
     Fraunces_600SemiBold, Fraunces_500Medium, Fraunces_400Regular_Italic,
     Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
   });
   const [feed, setFeed] = useState<Feed | null>(null);
-  const [tab, setTab] = useState<"chat" | "notes" | "connect">("chat");
+  const [tab, setTab] = useState<"chat" | "people" | "notes" | "connect">("chat");
   const [draft, setDraft] = useState("");
+  const [inputH, setInputH] = useState(INPUT_LINE_H);
   const [busy, setBusy] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+  const [payBusy, setPayBusy] = useState(false);
+  const [payErr, setPayErr] = useState("");
   const [serverConnected, setServerConnected] = useState<string[]>([]);
+  const [graph, setGraph] = useState<{ people: GraphPerson[]; promises: PromiseItem[] }>({ people: [], promises: [] });
   const [pending, setPending] = useState<{ id: string; content: string }[]>([]);
   const [thinking, setThinking] = useState(false);
   const seen = useRef<Set<string>>(new Set());
@@ -89,10 +108,15 @@ export default function App() {
     } catch (e) { /* keep last good feed */ }
   }, []);
 
+  const loadGraph = useCallback(async () => {
+    try { setGraph(await getGraph()); } catch (e) {}
+  }, []);
+
   useEffect(() => {
     Notifications.requestPermissionsAsync().catch(() => {});
     refresh();
     getConnections().then(setServerConnected).catch(() => {});
+    loadGraph();
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -107,9 +131,15 @@ export default function App() {
     return () => clearInterval(id);
   }, [refresh]);
 
+  useEffect(() => { if (tab === "people") loadGraph(); }, [tab, loadGraph]);
+
   useEffect(() => {
     if (tab === "chat") setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 120);
   }, [feed?.messages?.length, tab]);
+
+  useEffect(() => {
+    if (!draft) setInputH(INPUT_LINE_H);
+  }, [draft]);
 
   const send = async () => {
     const t = draft.trim();
@@ -121,7 +151,7 @@ export default function App() {
     setPending((p) => [...p, { id: tempId, content: t }]);
     setDraft(""); setBusy(true); setThinking(true);
     setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 60);
-    try { await capture(t); await refresh(); }
+    try { await agent(t); await refresh(); loadGraph(); }
     finally { sendingRef.current = false; setPending((p) => p.filter((x) => x.id !== tempId)); setThinking(false); setBusy(false); }
   };
   const act = async (card: Card, decision: "approve" | "decline") => {
@@ -165,9 +195,9 @@ export default function App() {
     } catch (e) { /* ignore */ }
   };
   const clearChatFlow = () => {
-    Alert.alert("clear chat?", "this clears the conversation. your memory stays.", [
-      { text: "cancel", style: "cancel" },
-      { text: "clear", style: "destructive", onPress: async () => {
+    Alert.alert("Clear chat?", "This clears the conversation. Your memory stays.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Clear", style: "destructive", onPress: async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
         setPending([]); setThinking(false);
         try { await clearChat(); } catch (e) {}
@@ -177,93 +207,203 @@ export default function App() {
     ]);
   };
 
+  const briefFlow = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setTab("chat"); setBusy(true); setThinking(true);
+    try { await getBrief(); await refresh(); } finally { setThinking(false); setBusy(false); }
+  };
+  const signOut = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    try { await logout(); } catch (e) {}
+    onSignOut();
+  };
+  const onSubscribe = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setPayBusy(true); setPayErr("");
+    try {
+      const plans = await getPlans();
+      const plan = plans.find((p) => /pro/i.test(p.name)) || plans[0];
+      if (!plan) { setPayErr("billing is being set up, check back shortly."); return; }
+      const res = await subscribe(plan.id);
+      if (res.url) {
+        await WebBrowser.openBrowserAsync(res.url);
+        for (let i = 0; i < 8; i++) {
+          const sub = await getSubscription();
+          if (sub && (sub.status === "active" || sub.status === "trialing")) { await refresh(); setPayOpen(false); break; }
+          await new Promise((r2) => setTimeout(r2, 1500));
+        }
+      } else setPayErr(res.error || "could not start checkout.");
+    } finally { setPayBusy(false); }
+  };
+
   if (!loaded) {
-    return <View style={[s.fill, s.center, { backgroundColor: c.bg }]}><Orb size={120} state="idle" /></View>;
+    return <View style={[s.fill, s.centered, { backgroundColor: c.bg }]}><Orb size={120} state="idle" /></View>;
   }
 
   const cards = feed?.cards || [];
   const pendingUrgent = cards.some((x) => x.type === "urgent" && x.status === "pending");
   const headerState: "idle" | "thinking" | "warm" = busy || thinking ? "thinking" : pendingUrgent ? "warm" : "idle";
   const locName = feed?.context?.location?.name;
-  const status = feed?.context?.in_meeting ? "in a meeting" : (locName && locName !== "nearby" ? "near " + locName : "all quiet");
+  const status = feed?.context?.in_meeting
+    ? "In a meeting"
+    : locName && locName !== "nearby"
+      ? `Near ${locName}`
+      : "Watching quietly";
   const hasChat = (feed?.messages?.length || 0) > 0 || pending.length > 0;
   const cardById = (id: string | null) => (id ? cards.find((x) => x.id === id) : undefined);
   const notes = (feed?.memories || []).filter((m) => m.source === "note");
+  const isPro = feed?.entitlement?.tier === "pro";
 
   return (
     <SafeAreaView style={[s.fill, { backgroundColor: c.bg }]}>
       <StatusBar style="dark" />
       <View style={s.header}>
-        <Orb size={34} state={headerState} />
-        <View style={{ flex: 1, marginLeft: sp.m }}>
+        <Orb size={32} state={headerState} />
+        <View style={s.headerText}>
           <Text style={s.brand}>Aura</Text>
-          <Text style={s.status}>{status}</Text>
+          <View style={s.statusRow}>
+            <View style={[s.statusDot, { backgroundColor: headerState === "thinking" ? c.lavender : headerState === "warm" ? c.peach : c.mint }]} />
+            <Text style={s.status}>{status}</Text>
+          </View>
         </View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <View style={s.headerActions}>
           {tab === "chat" && hasChat ? (
-            <Press onPress={clearChatFlow} style={s.iconBtn} hitSlop={10}>
-              <Feather name="trash-2" size={16} color={c.muted} />
+            <Press onPress={clearChatFlow} style={s.iconBtn} hitSlop={8}>
+              <Feather name="trash-2" size={18} color={c.muted} />
             </Press>
           ) : null}
-          <Press onPress={() => setDemoOpen(true)} style={s.demoBtn} hitSlop={10}>
-            <Text style={s.demoBtnTxt}>✦ demo</Text>
+          <Press onPress={() => setDemoOpen(true)} style={s.demoBtn} hitSlop={8}>
+            <Feather name="play-circle" size={16} color={c.accent} />
+            <Text style={s.demoBtnTxt}>Demo</Text>
           </Press>
         </View>
       </View>
 
       {tab === "chat" && (
         <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
-          <ScrollView ref={scroller} style={s.fill} contentContainerStyle={{ padding: sp.xl, paddingBottom: sp.h }}>
-            {(!feed?.messages || feed.messages.length === 0) && pending.length === 0 && <EmptyChat />}
+          <ScrollView ref={scroller} style={s.fill} contentContainerStyle={s.pageScroll} keyboardShouldPersistTaps="handled">
+            {(!feed?.messages || feed.messages.length === 0) && pending.length === 0 && (
+              <EmptyChat onSuggest={setDraft} onDemo={() => setDemoOpen(true)} />
+            )}
             {feed?.messages?.map((m) => (
               <FadeInUp key={m.id}>
                 <Bubble m={m} />
-                {m.card_id && cardById(m.card_id) && <InlineCard card={cardById(m.card_id)!} onAct={act} busy={busy} />}
+                {m.card_id && cardById(m.card_id) ? (
+                  <InlineCard card={cardById(m.card_id)!} onAct={act} busy={busy} />
+                ) : null}
               </FadeInUp>
             ))}
             {pending.filter((p) => !(feed?.messages || []).some((m) => m.role === "user" && m.content === p.content)).map((p) => (
-              <View key={p.id} style={[s.row, { justifyContent: "flex-end" }]}>
+              <View key={p.id} style={s.msgRowUser}>
                 <View style={[s.bubble, s.bubbleUser]}><Text style={s.bubbleTxt}>{p.content}</Text></View>
               </View>
             ))}
-            {thinking && <ThinkingBubble />}
+            {thinking ? <ThinkingBubble /> : null}
           </ScrollView>
           <View style={s.composer}>
-            <TextInput style={s.input} value={draft} onChangeText={setDraft} placeholder="tell aura anything" placeholderTextColor={c.muted} multiline />
-            <MicButton onResult={(t) => setDraft((d) => (d ? d + " " + t : t))} disabled={busy} />
-            <Press onPress={send} style={[s.sendBtn, { opacity: draft.trim() ? 1 : 0.4 }]} disabled={!draft.trim()}>
-              {busy ? <ActivityIndicator color={c.bg} /> : <Feather name="arrow-up" size={20} color={c.bg} />}
-            </Press>
+            <View style={[s.inputShell, inputH > INPUT_LINE_H && s.inputShellTall]}>
+              <TextInput
+                style={[s.input, { height: Math.max(INPUT_LINE_H, inputH) }]}
+                value={draft}
+                onChangeText={setDraft}
+                placeholder="Message Aura…"
+                placeholderTextColor={c.muted}
+                multiline
+                scrollEnabled={inputH >= INPUT_MAX_H}
+                onContentSizeChange={(e) => {
+                  const h = e.nativeEvent.contentSize.height;
+                  setInputH(Math.min(INPUT_MAX_H, Math.max(INPUT_LINE_H, h)));
+                }}
+              />
+              <View style={s.inputActions}>
+                <MicButton
+                  variant="inline"
+                  onResult={(t) => setDraft((d) => (d ? d + " " + t : t))}
+                  disabled={busy}
+                  size={32}
+                />
+                <Press onPress={send} style={[s.sendBtn, !draft.trim() && s.sendBtnOff]} disabled={!draft.trim() || busy}>
+                  {busy ? (
+                    <ActivityIndicator color="#FFF" size="small" />
+                  ) : (
+                    <Feather name="arrow-up" size={18} color={draft.trim() ? "#FFF" : c.muted} />
+                  )}
+                </Press>
+              </View>
+            </View>
           </View>
         </KeyboardAvoidingView>
       )}
 
+      {tab === "people" && <PeopleView people={graph.people} promises={graph.promises} onRefresh={loadGraph} isPro={isPro} onUpgrade={() => setPayOpen(true)} onBrief={briefFlow} onSignOut={signOut} />}
       {tab === "notes" && <NotesView notes={notes} onAdd={addNoteFlow} busy={busy} />}
       {tab === "connect" && <ConnectView serverConnected={serverConnected} onConnect={connectFlow} />}
 
-      <View style={s.tabs}>
-        {([["chat", "message-circle", "chat"], ["notes", "edit-3", "notes"], ["connect", "grid", "connect"]] as const).map(([k, icon, l]) => (
-          <Press key={k} onPress={() => { Haptics.selectionAsync().catch(() => {}); ease(); setTab(k as any); }} style={[s.tab, tab === k && s.tabActive]}>
-            <Feather name={icon as any} size={19} color={tab === k ? c.text : c.muted} style={{ marginBottom: 3 }} />
-            <Text style={[s.tabLabel, { color: tab === k ? c.text : c.muted }]}>{l}</Text>
-          </Press>
-        ))}
+      <View style={s.tabBar}>
+        {TABS.map(({ key, icon, label }) => {
+          const active = tab === key;
+          return (
+            <Press
+              key={key}
+              onPress={() => { Haptics.selectionAsync().catch(() => {}); ease(); setTab(key); }}
+              style={s.tab}
+            >
+              <Feather name={icon as any} size={20} color={active ? c.accent : c.muted} />
+              <Text style={[s.tabLabel, active && s.tabLabelActive]}>{label}</Text>
+              {active ? <View style={s.tabIndicator} /> : null}
+            </Press>
+          );
+        })}
       </View>
 
       <Modal visible={demoOpen} transparent animationType="fade" onRequestClose={() => setDemoOpen(false)}>
         <Pressable style={s.modalBg} onPress={() => setDemoOpen(false)}>
-          <View style={s.sheet}>
-            <Text style={s.sheetTitle}>aura actions</Text>
-            <Text style={s.sheetSub}>live, plus a few you can simulate</Text>
-            <DemoBtn icon="inbox" label="check my inbox (live)" onPress={syncEmailFlow} />
-            <DemoBtn icon="map-pin" label="walk past the bakery" onPress={() => runSim("near_bakery")} />
-            <DemoBtn icon="mail" label="email arrives (you're in a meeting)" onPress={() => runSim("incoming_email")} />
-            <DemoBtn icon="zap" label="urgent email arrives" onPress={() => runSim("incoming_email", { urgent: true })} />
-            <DemoBtn icon="check-circle" label="your meeting ends" onPress={() => runSim("meeting_end")} />
-          </View>
+          <Pressable style={s.sheet} onPress={() => {}}>
+            <View style={s.sheetGrabber} />
+            <Text style={s.sheetTitle}>Try Aura</Text>
+            <Text style={s.sheetSub}>Run a live action or simulate a scenario</Text>
+            <DemoBtn icon="inbox" label="Check my inbox" sub="Live" onPress={syncEmailFlow} />
+            <DemoBtn icon="map-pin" label="Walk past the bakery" onPress={() => runSim("near_bakery")} />
+            <DemoBtn icon="mail" label="Email while in a meeting" onPress={() => runSim("incoming_email")} />
+            <DemoBtn icon="zap" label="Urgent email arrives" onPress={() => runSim("incoming_email", { urgent: true })} />
+            <DemoBtn icon="check-circle" label="Meeting ends" onPress={() => runSim("meeting_end")} />
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={payOpen} transparent animationType="fade" onRequestClose={() => setPayOpen(false)}>
+        <Pressable style={s.modalBg} onPress={() => setPayOpen(false)}>
+          <Pressable style={s.sheet} onPress={() => {}}>
+            <View style={s.sheetGrabber} />
+            <View style={s.payHeader}>
+              <Orb size={38} state="warm" />
+              <Text style={s.payTitle}>Aura Pro</Text>
+            </View>
+            <Text style={s.payPrice}>$12<Text style={s.payPriceUnit}> / month</Text></Text>
+            {["unlimited people and promises", "your proactive daily brief", "priority ai model", "early access to new powers"].map((f) => (
+              <View key={f} style={s.payFeatureRow}>
+                <View style={s.payCheck}><Feather name="check" size={13} color={c.accent} /></View>
+                <Text style={s.payFeature}>{f}</Text>
+              </View>
+            ))}
+            {payErr ? <Text style={s.payErr}>{payErr}</Text> : null}
+            <Press style={s.payCta} onPress={onSubscribe} disabled={payBusy}>
+              {payBusy ? <ActivityIndicator color="#FFF" /> : <Text style={s.payCtaTxt}>Start 7 day free trial</Text>}
+            </Press>
+            <Text style={s.payFine}>cancel anytime. billed monthly after the trial.</Text>
+          </Pressable>
         </Pressable>
       </Modal>
     </SafeAreaView>
+  );
+}
+
+function ScreenHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <View style={s.screenHeader}>
+      <Text style={s.screenTitle}>{title}</Text>
+      <Text style={s.screenSub}>{subtitle}</Text>
+    </View>
   );
 }
 
@@ -277,7 +417,7 @@ function FadeInUp({ children, delay = 0 }: { children: React.ReactNode; delay?: 
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 // smooth spring press, the react native equivalent of a framer motion tap/hover.
-function Press({ children, onPress, disabled, style, scaleTo = 0.97, hitSlop }: { children: React.ReactNode; onPress?: () => void; disabled?: boolean; style?: any; scaleTo?: number; hitSlop?: number }) {
+function Press({ children, onPress, disabled, style, scaleTo = 0.96, hitSlop }: { children: React.ReactNode; onPress?: () => void; disabled?: boolean; style?: any; scaleTo?: number; hitSlop?: number }) {
   const a = useRef(new Animated.Value(1)).current;
   const to = (v: number) => Animated.spring(a, { toValue: v, useNativeDriver: true, friction: 7, tension: 140 }).start();
   return (
@@ -296,10 +436,19 @@ function Press({ children, onPress, disabled, style, scaleTo = 0.97, hitSlop }: 
 
 function Bubble({ m }: { m: Message }) {
   const mine = m.role === "user";
+  if (mine) {
+    return (
+      <View style={s.msgRowUser}>
+        <View style={[s.bubble, s.bubbleUser]}>
+          <Text style={s.bubbleTxt}>{m.content}</Text>
+        </View>
+      </View>
+    );
+  }
   return (
-    <View style={[s.row, { justifyContent: mine ? "flex-end" : "flex-start" }]}>
-      <View style={[s.bubble, mine ? s.bubbleUser : s.bubbleAura]}>
-        <Text style={[s.bubbleTxt, !mine && s.lower]}>{m.content}</Text>
+    <View style={s.msgRowAura}>
+      <View style={[s.bubble, s.bubbleAura]}>
+        <Text style={[s.bubbleTxt, s.auraVoice]}>{m.content}</Text>
       </View>
     </View>
   );
@@ -318,10 +467,10 @@ function ThinkingBubble() {
     return () => anims.forEach((a) => a.stop());
   }, []);
   return (
-    <View style={[s.row, { justifyContent: "flex-start" }]}>
-      <View style={[s.bubble, s.bubbleAura, { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 15 }]}>
+    <View style={s.msgRowAura}>
+      <View style={[s.bubble, s.bubbleAura, s.thinkingBubble]}>
         {dots.map((v, i) => (
-          <Animated.View key={i} style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: c.muted, opacity: v, transform: [{ scale: v }] }} />
+          <Animated.View key={i} style={[s.thinkingDot, { opacity: v, transform: [{ scale: v }] }]} />
         ))}
       </View>
     </View>
@@ -364,7 +513,7 @@ function InlineCard({ card, onAct, busy }: { card: Card; onAct: (c: Card, d: "ap
       <View style={s.card}>
         <Text style={s.cardTitle}>{card.title}</Text>
         <Text style={s.cardBody}>{card.body}</Text>
-        <View style={s.doneRow}><Feather name="check" size={15} color="#5BA37E" style={{ marginRight: 5 }} /><Text style={s.doneTxt}>done</Text></View>
+        <View style={s.doneRow}><Feather name="check" size={15} color={c.success} /><Text style={s.doneTxt}>Done</Text></View>
       </View>
     );
   }
@@ -374,25 +523,27 @@ function InlineCard({ card, onAct, busy }: { card: Card; onAct: (c: Card, d: "ap
   const nopeOp = pan.interpolate({ inputRange: [-96, -14], outputRange: [1, 0], extrapolate: "clamp" });
   return (
     <Animated.View style={[s.card, urgent && s.cardUrgent, { transform: [{ translateX: pan }, { rotate }] }]} {...responder.panHandlers}>
-      <Animated.View pointerEvents="none" style={[s.stamp, s.stampApprove, { opacity: approveOp }]}><Text style={s.stampApproveTxt}>approve</Text></Animated.View>
-      <Animated.View pointerEvents="none" style={[s.stamp, s.stampNope, { opacity: nopeOp }]}><Text style={s.stampNopeTxt}>not now</Text></Animated.View>
+      <Animated.View pointerEvents="none" style={[s.stamp, s.stampApprove, { opacity: approveOp }]}><Text style={s.stampApproveTxt}>Approve</Text></Animated.View>
+      <Animated.View pointerEvents="none" style={[s.stamp, s.stampNope, { opacity: nopeOp }]}><Text style={s.stampNopeTxt}>Not now</Text></Animated.View>
       {(card.memory_refs?.length || urgent) ? (
         <View style={s.chipRow}>
-          {urgent && <View style={s.tag}><Text style={s.tagTxt}>urgent</Text></View>}
+          {urgent ? <View style={s.tag}><Text style={s.tagTxt}>Urgent</Text></View> : null}
           {(card.memory_refs || []).slice(0, 1).map((mr, i) => {
             const short = String(mr).split("\n")[0].replace(/^extra context:\s*/i, "").trim();
-            return <View key={i} style={s.chip}><Text style={s.chipTxt} numberOfLines={1}>🧠 {short.length > 36 ? short.slice(0, 36) + "…" : short}</Text></View>;
+            return <View key={i} style={s.chip}><Text style={s.chipTxt} numberOfLines={1}>From memory · {short.length > 32 ? short.slice(0, 32) + "…" : short}</Text></View>;
           })}
         </View>
       ) : null}
       <Text style={s.cardTitle}>{card.title}</Text>
       <Text style={s.cardBody}>{card.body}</Text>
+      <Text style={s.swipeHint}>Swipe right to approve · left to dismiss</Text>
       <View style={s.btnRow}>
         <Press style={s.approve} onPress={() => finish("approve", 1)} disabled={busy}>
-          <Text style={s.approveTxt}>approve</Text>
+          <Feather name="check" size={18} color="#FFF" style={{ marginRight: 6 }} />
+          <Text style={s.approveTxt}>Approve</Text>
         </Press>
         <Press style={s.decline} onPress={() => finish("decline", -1)} disabled={busy}>
-          <Text style={s.declineTxt}>not now</Text>
+          <Text style={s.declineTxt}>Not now</Text>
         </Press>
       </View>
     </Animated.View>
@@ -404,33 +555,32 @@ function NotesView({ notes, onAdd, busy }: { notes: Memory[]; onAdd: (t: string)
   const submit = () => { if (!d.trim()) return; onAdd(d); setD(""); };
   return (
     <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
-      <ScrollView style={s.fill} contentContainerStyle={{ padding: sp.xl, paddingBottom: sp.h }} keyboardShouldPersistTaps="handled">
-        <Text style={s.notesTitle}>notes</Text>
+      <ScrollView style={s.fill} contentContainerStyle={s.pageScroll} keyboardShouldPersistTaps="handled">
+        <ScreenHeader title="Notes" subtitle="Anything you save becomes memory Aura can recall later." />
         <View style={s.notePage}>
           <TextInput
             style={s.notePageInput}
             value={d}
             onChangeText={setD}
-            placeholder={"start writing.\nanything you jot becomes memory aura can use."}
+            placeholder="Write a note…"
             placeholderTextColor={c.muted}
             multiline
             textAlignVertical="top"
           />
           <View style={s.notePageFooter}>
-            <Text style={s.noteHint}>{d.trim() ? "saves to your memory" : "type or speak"}</Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <MicButton onResult={(t) => setD((p) => (p ? p + " " + t : t))} disabled={busy} size={40} />
-              <Press onPress={submit} disabled={!d.trim()} style={[s.saveBtn, { opacity: d.trim() ? 1 : 0.4 }]}>
-                {busy ? <ActivityIndicator color={c.bg} /> : <Text style={s.saveTxt}>save</Text>}
+            <Text style={s.noteHint}>{d.trim() ? "Tap Save to add to memory" : "Type or tap the mic"}</Text>
+            <View style={s.noteActions}>
+              <MicButton onResult={(t) => setD((p) => (p ? p + " " + t : t))} disabled={busy} size={layout.controlSm} />
+              <Press onPress={submit} disabled={!d.trim()} style={[s.saveBtn, !d.trim() && s.sendBtnOff]}>
+                {busy ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={s.saveTxt}>Save</Text>}
               </Press>
             </View>
           </View>
         </View>
-        {notes.length > 0 && <Text style={s.notesSection}>earlier</Text>}
+        {notes.length > 0 ? <Text style={s.sectionLabel}>Saved notes</Text> : null}
         {notes.map((n) => (
           <FadeInUp key={n.id}>
             <View style={s.noteItem}>
-              <View style={s.noteDot} />
               <Text style={s.noteItemTxt}>{n.text}</Text>
             </View>
           </FadeInUp>
@@ -441,25 +591,28 @@ function NotesView({ notes, onAdd, busy }: { notes: Memory[]; onAdd: (t: string)
 }
 
 function ConnectView({ serverConnected, onConnect }: { serverConnected: string[]; onConnect: (slug: string) => void }) {
+  const connected = TOOLS.filter((t) => t.slug && serverConnected.includes(t.slug)).length;
   return (
-    <ScrollView style={s.fill} contentContainerStyle={{ padding: sp.xl, paddingBottom: sp.h, alignItems: "center" }}>
-      <Orb size={128} state="idle" style={{ marginTop: sp.s, marginBottom: sp.l }} />
-      <Text style={s.hero}>Aura</Text>
-      <Text style={[s.lede, { textAlign: "center", marginBottom: sp.xl }]}>
-        connect your world. aura quietly remembers, drafts, and handles the small stuff, and only interrupts you when it matters.
-      </Text>
+    <ScrollView style={s.fill} contentContainerStyle={s.pageScroll} keyboardShouldPersistTaps="handled">
+      <ScreenHeader title="Connect" subtitle="Link your apps so Aura can read context and act on your behalf." />
+      <View style={s.connectSummary}>
+        <Text style={s.connectSummaryTxt}>{connected} of {TOOLS.filter((t) => t.slug).length} connected</Text>
+      </View>
       {TOOLS.map((t) => {
         const on = !!t.slug && serverConnected.includes(t.slug);
         const connectable = !!t.slug;
         return (
-          <Press key={t.key} style={s.tool} onPress={() => connectable && onConnect(t.slug)} disabled={!connectable || on}>
+          <Press key={t.key} style={[s.tool, on && s.toolConnected, !connectable && s.toolDisabled]} onPress={() => connectable && !on && onConnect(t.slug)} disabled={!connectable || on}>
             <View style={s.toolTile}>{t.brand ? <BrandIcon brand={t.brand} size={22} /> : <Feather name={t.icon as any} size={18} color={c.text} />}</View>
-            <View style={{ flex: 1 }}>
+            <View style={s.toolBody}>
               <Text style={s.toolLabel}>{t.label}</Text>
               <Text style={s.toolSub}>{t.sub}</Text>
             </View>
-            <View style={[s.connectPill, on ? s.connectPillOn : !connectable && s.connectPillSoon]}>
-              <Text style={[s.connectPillTxt, { color: on ? c.text : !connectable ? c.muted : c.bg }]}>{on ? "connected" : connectable ? "connect" : "soon"}</Text>
+            <View style={[s.connectPill, on ? s.connectPillOn : !connectable ? s.connectPillSoon : null]}>
+              {on ? <Feather name="check" size={14} color={c.success} style={{ marginRight: 4 }} /> : null}
+              <Text style={[s.connectPillTxt, on ? s.connectPillTxtOn : !connectable ? s.connectPillTxtMuted : s.connectPillTxtAction]}>
+                {on ? "Connected" : connectable ? "Connect" : "Soon"}
+              </Text>
             </View>
           </Press>
         );
@@ -468,103 +621,523 @@ function ConnectView({ serverConnected, onConnect }: { serverConnected: string[]
   );
 }
 
-const EmptyChat = () => (
-  <View style={[s.center, { paddingTop: sp.xh }]}>
-    <Orb size={132} state="idle" />
-    <Text style={[s.h1, { marginTop: sp.xl }]}>hi, i'm aura.</Text>
-    <Text style={[s.lede, { textAlign: "center", marginTop: sp.s }]}>
-      tell me a thought, a plan, a person you care about. i'll remember, and bring it back the moment it's useful.
-    </Text>
+function PeopleView({ people, promises, onRefresh, isPro, onUpgrade, onBrief, onSignOut }: { people: GraphPerson[]; promises: PromiseItem[]; onRefresh: () => Promise<void> | void; isPro: boolean; onUpgrade: () => void; onBrief: () => void; onSignOut: () => void }) {
+  const [refreshing, setRefreshing] = useState(false);
+  const doRefresh = async () => { setRefreshing(true); try { await onRefresh(); } finally { setRefreshing(false); } };
+  return (
+    <ScrollView
+      style={s.fill}
+      contentContainerStyle={s.pageScroll}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={doRefresh} tintColor={c.accent} />}
+    >
+      <ScreenHeader title="People" subtitle="Everyone you've told Aura about, and the promises between you. This is your relationship graph." />
+      {isPro ? (
+        <View style={s.proChip}><Feather name="star" size={13} color={c.accent} /><Text style={s.proChipTxt}>Aura Pro</Text></View>
+      ) : (
+        <Press style={s.upsell} onPress={onUpgrade}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.upsellTitle}>Unlock Aura Pro</Text>
+            <Text style={s.upsellSub}>your daily brief, unlimited people, and priority ai.</Text>
+          </View>
+          <View style={s.upsellCta}><Text style={s.upsellCtaTxt}>$12/mo</Text></View>
+        </Press>
+      )}
+      <Press style={s.briefBtn} onPress={onBrief}>
+        <Feather name="sun" size={17} color="#FFF" />
+        <Text style={s.briefBtnTxt}>Daily brief</Text>
+      </Press>
+      {promises.length > 0 ? (
+        <View style={{ marginBottom: sp.l }}>
+          <Text style={s.sectionLabel}>Open promises</Text>
+          {promises.map((p, i) => (
+            <FadeInUp key={i}>
+              <View style={s.promiseItem}>
+                <View style={s.promiseDot} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.promiseTxt}>{p.text}</Text>
+                  <Text style={s.promiseMeta}>
+                    {p.direction === "owed_to_me" ? "owed to you" : "you owe"}{p.person ? ` · ${p.person}` : ""}{p.due ? ` · by ${p.due}` : ""}
+                  </Text>
+                </View>
+              </View>
+            </FadeInUp>
+          ))}
+        </View>
+      ) : null}
+      <Text style={s.sectionLabel}>Your people</Text>
+      {people.length === 0 ? (
+        <View style={s.peopleEmpty}>
+          <Feather name="users" size={26} color={c.muted} />
+          <Text style={s.peopleEmptyTxt}>Tell Aura about someone you met, like "just met alex, runs a design studio, into film", and they'll show up here.</Text>
+        </View>
+      ) : (
+        people.map((p) => (
+          <FadeInUp key={p.person}>
+            <View style={s.personCard}>
+              <View style={s.personAvatar}><Text style={s.personInitial}>{(p.person || "?").trim().charAt(0).toUpperCase()}</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.personName}>{p.person}</Text>
+                {p.org ? <Text style={s.personOrg}>{p.org}</Text> : null}
+                {p.topics && p.topics.filter(Boolean).length ? (
+                  <View style={s.topicRow}>
+                    {p.topics.filter(Boolean).map((t) => (
+                      <View key={t} style={s.topicChip}><Text style={s.topicChipTxt}>{t}</Text></View>
+                    ))}
+                  </View>
+                ) : null}
+                {p.open_promises && p.open_promises.filter(Boolean).length ? (
+                  <View style={s.personPromises}>
+                    {p.open_promises.filter(Boolean).map((op, j) => (
+                      <View key={j} style={s.personPromiseRow}>
+                        <Feather name="corner-down-right" size={12} color={c.accent} />
+                        <Text style={s.personPromiseTxt}>{op}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          </FadeInUp>
+        ))
+      )}
+      <Press style={s.signOut} onPress={onSignOut} hitSlop={8}>
+        <Feather name="log-out" size={15} color={c.muted} />
+        <Text style={s.signOutTxt}>Sign out</Text>
+      </Press>
+    </ScrollView>
+  );
+}
+
+const EmptyChat = ({ onSuggest, onDemo }: { onSuggest: (t: string) => void; onDemo: () => void }) => (
+  <View style={s.empty}>
+    <Text style={s.emptyTitle}>What should I remember?</Text>
+    <Text style={s.emptySub}>Tell me a thought, plan, or person — I'll bring it back when it matters.</Text>
+    <View style={s.starterList}>
+      {STARTERS.map((t) => (
+        <Press key={t} style={s.starter} onPress={() => onSuggest(t)}>
+          <Text style={s.starterTxt}>{t}</Text>
+          <Feather name="arrow-up-right" size={16} color={c.muted} />
+        </Press>
+      ))}
+    </View>
+    <Press style={s.emptyDemo} onPress={onDemo}>
+      <Feather name="play-circle" size={18} color={c.accent} />
+      <Text style={s.emptyDemoTxt}>Run a demo scenario</Text>
+    </Press>
   </View>
 );
 
-const DemoBtn = ({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) => (
+const DemoBtn = ({ icon, label, sub, onPress }: { icon: string; label: string; sub?: string; onPress: () => void }) => (
   <Press style={s.demoRow} onPress={onPress}>
-    <Feather name={icon as any} size={18} color={c.text} style={{ marginRight: 12 }} />
-    <Text style={s.demoRowTxt}>{label}</Text>
+    <View style={s.demoRowIcon}>
+      <Feather name={icon as any} size={17} color={c.accent} />
+    </View>
+    <View style={{ flex: 1 }}>
+      <Text style={s.demoRowTxt}>{label}</Text>
+      {sub ? <Text style={s.demoRowSub}>{sub}</Text> : null}
+    </View>
+    <Feather name="chevron-right" size={18} color={c.muted} />
   </Press>
 );
 
 const s = StyleSheet.create({
   fill: { flex: 1 },
-  center: { alignItems: "center", justifyContent: "center" },
-  pressed: { transform: [{ scale: 0.96 }], opacity: 0.96 },
-  lower: { textTransform: "lowercase" },
-  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: sp.xl, paddingTop: sp.s, paddingBottom: sp.m, borderBottomWidth: 1, borderBottomColor: c.hairline },
-  brand: { fontFamily: font.display, fontSize: ty.h2, color: c.text, letterSpacing: -0.5 },
-  status: { fontFamily: font.body, fontSize: ty.caption, color: c.muted, marginTop: 1 },
-  demoBtn: { paddingHorizontal: sp.m, paddingVertical: sp.s, borderRadius: r.chip, backgroundColor: c.surfaceAlt },
-  iconBtn: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: c.surfaceAlt },
-  demoBtnTxt: { fontFamily: font.medium, fontSize: ty.caption, color: c.muted },
+  centered: { alignItems: "center", justifyContent: "center" },
+  pageScroll: { paddingHorizontal: layout.page, paddingTop: sp.l, paddingBottom: sp.xxl },
 
-  row: { flexDirection: "row", marginBottom: sp.m },
-  bubble: { maxWidth: "82%", paddingHorizontal: 15, paddingVertical: 11, borderRadius: r.bubble },
-  bubbleAura: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.hairline, borderBottomLeftRadius: 6 },
-  bubbleUser: { backgroundColor: c.userBubble, borderBottomRightRadius: 6 },
-  bubbleTxt: { fontFamily: font.body, fontSize: ty.body, lineHeight: 23, color: c.text },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: layout.page,
+    paddingVertical: sp.m,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.hairline,
+    backgroundColor: c.bg,
+  },
+  headerText: { flex: 1, marginLeft: sp.m, justifyContent: "center" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: sp.s },
+  brand: { fontFamily: font.display, fontSize: ty.h2, color: c.text, letterSpacing: -0.4, lineHeight: 24 },
+  statusRow: { flexDirection: "row", alignItems: "center", marginTop: 2, gap: 6 },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  status: { fontFamily: font.body, fontSize: ty.caption, color: c.muted, lineHeight: 18 },
+  demoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: sp.m,
+    height: layout.controlSm,
+    borderRadius: r.button,
+    backgroundColor: c.accentSoft,
+  },
+  demoBtnTxt: { fontFamily: font.semibold, fontSize: ty.caption, color: c.accent },
+  iconBtn: {
+    width: layout.controlSm,
+    height: layout.controlSm,
+    borderRadius: layout.controlSm / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: c.surfaceAlt,
+  },
 
-  card: { ...shadow.card, backgroundColor: c.surface, borderRadius: r.card, borderWidth: 1, borderColor: c.hairline, padding: 18, marginBottom: sp.l, marginTop: 2 },
-  cardUrgent: { borderColor: "#F3B7B0", backgroundColor: "#FFF6F4" },
+  screenHeader: { marginBottom: sp.l },
+  screenTitle: { fontFamily: font.display, fontSize: ty.hero, color: c.text, letterSpacing: -0.5, lineHeight: 36 },
+  screenSub: { fontFamily: font.body, fontSize: ty.subhead, color: c.muted, lineHeight: 22, marginTop: 4 },
+
+  msgRowUser: { flexDirection: "row", justifyContent: "flex-end", marginBottom: sp.m, width: "100%" },
+  msgRowAura: { width: "100%", marginBottom: sp.m },
+  bubble: { width: "100%", paddingHorizontal: sp.m + 2, paddingVertical: sp.m, borderRadius: r.bubble },
+  bubbleAura: { backgroundColor: c.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: c.hairline, borderBottomLeftRadius: r.bubbleTail },
+  bubbleUser: { backgroundColor: c.userBubble, borderBottomRightRadius: r.bubbleTail, maxWidth: "85%", width: "auto" },
+  bubbleTxt: { fontFamily: font.body, fontSize: ty.body, lineHeight: 22, color: c.text },
+  auraVoice: { textTransform: "lowercase" },
+  thinkingBubble: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: sp.m + 2, width: "auto", alignSelf: "flex-start" },
+  thinkingDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: c.muted },
+
+  card: {
+    width: "100%",
+    backgroundColor: c.surface,
+    borderRadius: r.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.hairline,
+    padding: sp.l,
+    marginBottom: sp.m,
+    ...shadow.card,
+  },
+  cardUrgent: { borderColor: c.urgentBorder, backgroundColor: c.urgentBg },
   chipRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginBottom: sp.m },
-  tag: { backgroundColor: c.blush, paddingHorizontal: 9, paddingVertical: 4, borderRadius: r.chip, alignItems: "center", justifyContent: "center" },
-  tagTxt: { fontFamily: font.bold, fontSize: 10, lineHeight: 13, color: c.text, letterSpacing: 0.5 },
-  chip: { backgroundColor: c.chipBg, paddingHorizontal: 9, paddingVertical: 3, borderRadius: r.chip, alignSelf: "flex-start", maxWidth: "100%" },
-  chipTxt: { fontFamily: font.medium, fontSize: 11.5, color: c.muted, textTransform: "lowercase" },
-  cardTitle: { fontFamily: font.display, fontSize: ty.title, color: c.text, letterSpacing: -0.3, marginBottom: 6, textTransform: "lowercase" },
-  cardBody: { fontFamily: font.body, fontSize: ty.subhead, lineHeight: 22, color: c.muted, marginBottom: sp.l, textTransform: "lowercase" },
-  btnRow: { flexDirection: "row", gap: 10 },
-  approve: { ...shadow.soft, backgroundColor: c.accent, height: 50, borderRadius: r.button, flex: 1, alignItems: "center", justifyContent: "center" },
-  approveTxt: { fontFamily: font.semibold, fontSize: ty.subhead, color: c.bg },
-  decline: { height: 50, paddingHorizontal: sp.xl, borderRadius: r.button, borderWidth: 1, borderColor: c.hairline, backgroundColor: c.surface, alignItems: "center", justifyContent: "center" },
+  tag: { backgroundColor: c.blush, paddingHorizontal: sp.s, paddingVertical: 3, borderRadius: r.chip },
+  tagTxt: { fontFamily: font.bold, fontSize: ty.micro, color: c.text, letterSpacing: 0.3 },
+  chip: { backgroundColor: c.chipBg, paddingHorizontal: sp.s, paddingVertical: 3, borderRadius: r.chip, maxWidth: "100%" },
+  chipTxt: { fontFamily: font.medium, fontSize: ty.micro, color: c.muted },
+  cardTitle: { fontFamily: font.semibold, fontSize: ty.title, color: c.text, lineHeight: 24, marginBottom: 4 },
+  cardBody: { fontFamily: font.body, fontSize: ty.subhead, lineHeight: 22, color: c.muted, marginBottom: sp.m },
+  swipeHint: { fontFamily: font.medium, fontSize: ty.micro, color: c.muted, marginBottom: sp.m, textAlign: "center" },
+  btnRow: { flexDirection: "row", gap: sp.s },
+  approve: {
+    flex: 1,
+    height: layout.control,
+    borderRadius: r.button,
+    backgroundColor: c.accent,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  approveTxt: { fontFamily: font.semibold, fontSize: ty.subhead, color: "#FFF" },
+  decline: {
+    height: layout.control,
+    paddingHorizontal: sp.l,
+    borderRadius: r.button,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.hairline,
+    backgroundColor: c.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   declineTxt: { fontFamily: font.medium, fontSize: ty.subhead, color: c.muted },
-  doneRow: { flexDirection: "row", alignItems: "center" },
-  doneTxt: { fontFamily: font.semibold, fontSize: ty.subhead, color: "#5BA37E" },
-  stamp: { position: "absolute", top: 14, zIndex: 8, paddingHorizontal: 11, paddingVertical: 5, borderRadius: 9, borderWidth: 2.5, backgroundColor: "rgba(255,253,250,0.92)" },
-  stampApprove: { left: 14, borderColor: "#5BA37E", transform: [{ rotate: "-12deg" }] },
-  stampNope: { right: 14, borderColor: "#D98A86", transform: [{ rotate: "12deg" }] },
-  stampApproveTxt: { fontFamily: font.bold, fontSize: 14, color: "#5BA37E", letterSpacing: 1 },
-  stampNopeTxt: { fontFamily: font.bold, fontSize: 14, color: "#D98A86", letterSpacing: 1 },
+  doneRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  doneTxt: { fontFamily: font.semibold, fontSize: ty.subhead, color: c.success },
+  stamp: { position: "absolute", top: 12, zIndex: 8, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 2, backgroundColor: "rgba(255,253,250,0.95)" },
+  stampApprove: { left: 12, borderColor: c.success, transform: [{ rotate: "-12deg" }] },
+  stampNope: { right: 12, borderColor: c.danger, transform: [{ rotate: "12deg" }] },
+  stampApproveTxt: { fontFamily: font.bold, fontSize: 13, color: c.success },
+  stampNopeTxt: { fontFamily: font.bold, fontSize: 13, color: c.danger },
 
-  composer: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: sp.l, paddingVertical: sp.m, borderTopWidth: 1, borderTopColor: c.hairline, backgroundColor: c.bg, gap: sp.s },
-  input: { flex: 1, maxHeight: 120, minHeight: 46, backgroundColor: c.surface, borderRadius: r.input, borderWidth: 1, borderColor: c.hairline, paddingHorizontal: sp.l, paddingTop: 12, paddingBottom: 12, fontFamily: font.body, fontSize: ty.body, color: c.text },
-  sendBtn: { ...shadow.soft, width: 46, height: 46, borderRadius: 23, backgroundColor: c.accent, alignItems: "center", justifyContent: "center" },
-  sendTxt: { fontFamily: font.bold, fontSize: 20, color: c.text },
+  composer: {
+    paddingHorizontal: layout.page,
+    paddingVertical: sp.m,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.hairline,
+    backgroundColor: c.bg,
+  },
+  inputShell: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: c.surface,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.hairline,
+    paddingLeft: sp.m + 2,
+    paddingRight: 6,
+    paddingVertical: 4,
+  },
+  inputShellTall: { alignItems: "flex-end", paddingBottom: 6, paddingTop: 8 },
+  input: {
+    flex: 1,
+    paddingTop: Platform.OS === "ios" ? 6 : 4,
+    paddingBottom: Platform.OS === "ios" ? 6 : 4,
+    paddingRight: sp.s,
+    fontFamily: font.body,
+    fontSize: ty.body,
+    color: c.text,
+    lineHeight: 22,
+    textAlignVertical: "center",
+  },
+  inputActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  sendBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: c.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendBtnOff: { backgroundColor: c.surfaceAlt, opacity: 1 },
 
-  tabs: { flexDirection: "row", borderTopWidth: 1, borderTopColor: c.hairline, paddingTop: sp.s, paddingBottom: sp.l, paddingHorizontal: sp.l, backgroundColor: c.bg },
-  tab: { flex: 1, alignItems: "center", paddingVertical: sp.s, borderRadius: r.button },
-  tabActive: { backgroundColor: c.surfaceAlt },
-  tabGlyph: { fontSize: 18, marginBottom: 2 },
-  tabLabel: { fontFamily: font.medium, fontSize: ty.micro },
+  tabBar: {
+    flexDirection: "row",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.hairline,
+    backgroundColor: c.surface,
+    paddingBottom: sp.s,
+  },
+  tab: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: sp.m, position: "relative" },
+  tabLabel: { fontFamily: font.medium, fontSize: ty.micro, color: c.muted, marginTop: 3 },
+  tabLabelActive: { fontFamily: font.semibold, color: c.accent },
+  tabIndicator: { position: "absolute", top: 0, width: 32, height: 2, borderRadius: 1, backgroundColor: c.accent },
 
-  h1: { fontFamily: font.display, fontSize: ty.h1, color: c.text, letterSpacing: -0.6, textTransform: "lowercase" },
-  hero: { fontFamily: font.display, fontSize: ty.hero, color: c.text, letterSpacing: -0.8, marginBottom: sp.s },
-  lede: { fontFamily: font.body, fontSize: ty.subhead, lineHeight: 22, color: c.muted, marginTop: 4 },
+  empty: { paddingTop: sp.xl, paddingBottom: sp.l },
+  emptyTitle: { fontFamily: font.display, fontSize: ty.h1, color: c.text, letterSpacing: -0.5, lineHeight: 32 },
+  emptySub: { fontFamily: font.body, fontSize: ty.subhead, color: c.muted, lineHeight: 22, marginTop: sp.s, marginBottom: sp.l },
+  starterList: { gap: sp.s, marginBottom: sp.l },
+  starter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: c.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.hairline,
+    borderRadius: r.button,
+    paddingHorizontal: sp.m + 2,
+    paddingVertical: sp.m + 2,
+  },
+  starterTxt: { flex: 1, fontFamily: font.medium, fontSize: ty.subhead, color: c.text, lineHeight: 20, paddingRight: sp.s },
+  emptyDemo: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: sp.s, paddingVertical: sp.m },
+  emptyDemoTxt: { fontFamily: font.semibold, fontSize: ty.subhead, color: c.accent },
 
-  notesTitle: { fontFamily: font.display, fontSize: ty.hero, color: c.text, letterSpacing: -0.8, marginBottom: sp.l },
-  notePage: { ...shadow.card, backgroundColor: c.surface, borderRadius: r.card, borderWidth: 1, borderColor: c.hairline, padding: sp.xl, minHeight: 210 },
-  notePageInput: { fontFamily: font.body, fontSize: 18, lineHeight: 28, color: c.text, minHeight: 130, padding: 0 },
-  notePageFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: sp.l, borderTopWidth: 1, borderTopColor: c.hairline, paddingTop: sp.m },
-  noteHint: { fontFamily: font.body, fontSize: ty.caption, color: c.muted },
-  saveBtn: { ...shadow.soft, backgroundColor: c.accent, paddingHorizontal: sp.xl, paddingVertical: 11, borderRadius: r.button },
-  saveTxt: { fontFamily: font.semibold, fontSize: ty.subhead, color: c.bg },
-  notesSection: { fontFamily: font.medium, fontSize: ty.caption, color: c.muted, marginTop: sp.xxl, marginBottom: sp.xs, letterSpacing: 0.3 },
-  noteItem: { flexDirection: "row", alignItems: "flex-start", gap: sp.m, paddingVertical: sp.m, paddingHorizontal: sp.xs },
-  noteDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: c.lavender, marginTop: 9 },
-  noteItemTxt: { flex: 1, fontFamily: font.body, fontSize: ty.body, lineHeight: 24, color: c.text },
+  notePage: {
+    backgroundColor: c.surface,
+    borderRadius: r.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.hairline,
+    padding: sp.l,
+    minHeight: 180,
+    ...shadow.soft,
+  },
+  notePageInput: { fontFamily: font.body, fontSize: ty.body, lineHeight: 24, color: c.text, minHeight: 120, padding: 0 },
+  notePageFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: sp.m,
+    paddingTop: sp.m,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.hairline,
+  },
+  noteHint: { flex: 1, fontFamily: font.body, fontSize: ty.caption, color: c.muted, paddingRight: sp.s },
+  noteActions: { flexDirection: "row", alignItems: "center", gap: sp.s },
+  saveBtn: {
+    height: layout.controlSm,
+    paddingHorizontal: sp.l,
+    borderRadius: r.button,
+    backgroundColor: c.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveTxt: { fontFamily: font.semibold, fontSize: ty.subhead, color: "#FFF" },
+  sectionLabel: { fontFamily: font.semibold, fontSize: ty.caption, color: c.muted, marginTop: sp.xl, marginBottom: sp.s, letterSpacing: 0.5 },
+  noteItem: {
+    backgroundColor: c.surface,
+    borderRadius: r.button,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.hairline,
+    padding: sp.m + 2,
+    marginBottom: sp.s,
+  },
+  noteItemTxt: { fontFamily: font.body, fontSize: ty.body, lineHeight: 24, color: c.text },
 
-  tool: { ...shadow.soft, flexDirection: "row", alignItems: "center", width: "100%", backgroundColor: c.surface, borderRadius: 18, borderWidth: 1, borderColor: c.hairline, padding: sp.l, marginBottom: sp.m, gap: sp.m },
-  toolTile: { width: 44, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: c.bg, borderWidth: 1, borderColor: c.hairline },
-  toolLabel: { fontFamily: font.semibold, fontSize: ty.body, color: c.text },
-  toolSub: { fontFamily: font.body, fontSize: ty.caption, color: c.muted, marginTop: 1 },
-  connectPill: { paddingHorizontal: sp.l, paddingVertical: 7, borderRadius: r.chip, backgroundColor: c.accent },
-  connectPillOn: { backgroundColor: c.mint },
+  connectSummary: {
+    alignSelf: "flex-start",
+    backgroundColor: c.accentSoft,
+    paddingHorizontal: sp.m,
+    paddingVertical: 6,
+    borderRadius: r.chip,
+    marginBottom: sp.l,
+  },
+  connectSummaryTxt: { fontFamily: font.semibold, fontSize: ty.caption, color: c.accent },
+  tool: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: c.surface,
+    borderRadius: r.tool,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.hairline,
+    padding: sp.m + 2,
+    marginBottom: sp.s,
+  },
+  toolConnected: { backgroundColor: c.successSoft, borderColor: "rgba(74, 148, 104, 0.25)" },
+  toolDisabled: { opacity: 0.72 },
+  toolTile: {
+    width: 44,
+    height: 44,
+    borderRadius: r.toolTile,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: c.bg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.hairline,
+    marginRight: sp.m,
+  },
+  toolBody: { flex: 1, paddingRight: sp.s },
+  toolLabel: { fontFamily: font.semibold, fontSize: ty.body, color: c.text, lineHeight: 22 },
+  toolSub: { fontFamily: font.body, fontSize: ty.caption, color: c.muted, lineHeight: 18, marginTop: 1 },
+  connectPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 96,
+    justifyContent: "center",
+    paddingHorizontal: sp.m,
+    paddingVertical: 7,
+    borderRadius: r.chip,
+    backgroundColor: c.accent,
+  },
+  connectPillOn: { backgroundColor: c.successSoft, borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(74, 148, 104, 0.3)" },
   connectPillSoon: { backgroundColor: c.surfaceAlt },
-  connectPillTxt: { fontFamily: font.semibold, fontSize: ty.caption, color: c.bg },
+  connectPillTxt: { fontFamily: font.semibold, fontSize: ty.caption },
+  connectPillTxtOn: { color: c.success },
+  connectPillTxtAction: { color: "#FFF" },
+  connectPillTxtMuted: { color: c.muted },
 
-  modalBg: { flex: 1, backgroundColor: "rgba(20,16,12,0.35)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: c.bg, borderTopLeftRadius: r.sheet, borderTopRightRadius: r.sheet, padding: sp.xl, paddingBottom: sp.xh },
-  sheetTitle: { fontFamily: font.display, fontSize: ty.h2, color: c.text, letterSpacing: -0.4, textTransform: "lowercase" },
-  sheetSub: { fontFamily: font.body, fontSize: ty.caption, color: c.muted, marginBottom: sp.l },
-  demoRow: { ...shadow.soft, flexDirection: "row", alignItems: "center", backgroundColor: c.surface, borderWidth: 1, borderColor: c.hairline, borderRadius: 16, padding: sp.l, marginTop: sp.m },
-  demoRowTxt: { fontFamily: font.medium, fontSize: ty.body, color: c.text },
+  modalBg: { flex: 1, backgroundColor: c.overlay, justifyContent: "flex-end" },
+  sheet: {
+    backgroundColor: c.bg,
+    borderTopLeftRadius: r.sheet,
+    borderTopRightRadius: r.sheet,
+    paddingHorizontal: layout.page,
+    paddingTop: sp.m,
+    paddingBottom: sp.xh,
+  },
+  sheetGrabber: { width: 36, height: 4, borderRadius: 2, backgroundColor: c.hairline, alignSelf: "center", marginBottom: sp.l },
+  sheetTitle: { fontFamily: font.display, fontSize: ty.h2, color: c.text, letterSpacing: -0.3 },
+  sheetSub: { fontFamily: font.body, fontSize: ty.caption, color: c.muted, marginTop: 4, marginBottom: sp.m },
+  demoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: c.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.hairline,
+    borderRadius: r.button,
+    padding: sp.m + 2,
+    marginTop: sp.s,
+    gap: sp.m,
+  },
+  demoRowIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: c.accentSoft,
+  },
+  demoRowTxt: { fontFamily: font.semibold, fontSize: ty.body, color: c.text, lineHeight: 20 },
+  demoRowSub: { fontFamily: font.body, fontSize: ty.caption, color: c.muted, marginTop: 2 },
+
+  promiseItem: { flexDirection: "row", alignItems: "flex-start", gap: sp.s, backgroundColor: c.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: c.hairline, borderRadius: r.button, padding: sp.m + 2, marginBottom: sp.s },
+  promiseDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.accent, marginTop: 6 },
+  promiseTxt: { fontFamily: font.medium, fontSize: ty.subhead, color: c.text, lineHeight: 21 },
+  promiseMeta: { fontFamily: font.body, fontSize: ty.caption, color: c.muted, marginTop: 2 },
+  peopleEmpty: { alignItems: "center", gap: sp.m, paddingVertical: sp.xl, paddingHorizontal: sp.l },
+  peopleEmptyTxt: { fontFamily: font.body, fontSize: ty.subhead, color: c.muted, textAlign: "center", lineHeight: 22 },
+  personCard: { flexDirection: "row", alignItems: "flex-start", gap: sp.m, backgroundColor: c.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: c.hairline, borderRadius: r.card, padding: sp.l, marginBottom: sp.s, ...shadow.soft },
+  personAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: c.accentSoft, alignItems: "center", justifyContent: "center" },
+  personInitial: { fontFamily: font.display, fontSize: 20, color: c.accent },
+  personName: { fontFamily: font.semibold, fontSize: ty.body, color: c.text, lineHeight: 22 },
+  personOrg: { fontFamily: font.body, fontSize: ty.caption, color: c.muted, marginTop: 1 },
+  topicRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: sp.s },
+  topicChip: { backgroundColor: c.chipBg, paddingHorizontal: sp.s, paddingVertical: 3, borderRadius: r.chip },
+  topicChipTxt: { fontFamily: font.medium, fontSize: ty.micro, color: c.muted },
+  personPromises: { marginTop: sp.s, gap: 3 },
+  personPromiseRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  personPromiseTxt: { flex: 1, fontFamily: font.body, fontSize: ty.caption, color: c.text, lineHeight: 18 },
+
+  upsell: { flexDirection: "row", alignItems: "center", gap: sp.m, backgroundColor: c.accentSoft, borderRadius: r.card, padding: sp.l, marginBottom: sp.l },
+  upsellTitle: { fontFamily: font.semibold, fontSize: ty.body, color: c.accent },
+  upsellSub: { fontFamily: font.body, fontSize: ty.caption, color: c.accent, opacity: 0.85, marginTop: 2, lineHeight: 18 },
+  upsellCta: { backgroundColor: c.accent, paddingHorizontal: sp.m, paddingVertical: 7, borderRadius: r.chip },
+  upsellCtaTxt: { fontFamily: font.semibold, fontSize: ty.caption, color: "#FFF" },
+  proChip: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", backgroundColor: c.accentSoft, paddingHorizontal: sp.m, paddingVertical: 6, borderRadius: r.chip, marginBottom: sp.l },
+  proChipTxt: { fontFamily: font.semibold, fontSize: ty.caption, color: c.accent },
+  briefBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: sp.s, height: layout.control, borderRadius: r.button, backgroundColor: c.accent, marginBottom: sp.l },
+  briefBtnTxt: { fontFamily: font.semibold, fontSize: ty.body, color: "#FFF" },
+  signOut: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: sp.l, marginTop: sp.s },
+  signOutTxt: { fontFamily: font.medium, fontSize: ty.subhead, color: c.muted },
+
+  payHeader: { flexDirection: "row", alignItems: "center", gap: sp.s, marginBottom: sp.s },
+  payTitle: { fontFamily: font.display, fontSize: ty.h1, color: c.text, letterSpacing: -0.4 },
+  payPrice: { fontFamily: font.display, fontSize: 34, color: c.text, letterSpacing: -0.6, marginBottom: sp.m },
+  payPriceUnit: { fontFamily: font.body, fontSize: ty.subhead, color: c.muted },
+  payFeatureRow: { flexDirection: "row", alignItems: "center", gap: sp.s, marginBottom: sp.s },
+  payCheck: { width: 22, height: 22, borderRadius: 11, backgroundColor: c.accentSoft, alignItems: "center", justifyContent: "center" },
+  payFeature: { fontFamily: font.medium, fontSize: ty.subhead, color: c.text },
+  payCta: { height: layout.control, borderRadius: r.button, backgroundColor: c.accent, alignItems: "center", justifyContent: "center", marginTop: sp.m },
+  payCtaTxt: { fontFamily: font.semibold, fontSize: ty.body, color: "#FFF" },
+  payErr: { fontFamily: font.medium, fontSize: ty.caption, color: c.danger, marginTop: sp.s },
+  payFine: { fontFamily: font.body, fontSize: ty.caption, color: c.muted, textAlign: "center", marginTop: sp.s },
 });
+
+const authInputStyle: any = { backgroundColor: c.surface, borderWidth: 1, borderColor: c.hairline, borderRadius: 14, paddingHorizontal: 16, height: 54, fontFamily: font.body, fontSize: 16, color: c.text, marginBottom: 12 };
+
+function AuthGate({ onAuthed }: { onAuthed: () => void }) {
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const submit = async () => {
+    if (!email.trim() || !pw) { setErr("enter your email and password."); return; }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setBusy(true); setErr("");
+    const res = mode === "login" ? await login(email, pw) : await signup(email, pw, name);
+    setBusy(false);
+    if (res.ok) onAuthed(); else setErr(res.error || "something went wrong.");
+  };
+  return (
+    <SafeAreaView style={[s.fill, { backgroundColor: c.bg }]}>
+      <StatusBar style="dark" />
+      <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 28 }}>
+          <View style={{ alignItems: "center", marginBottom: 30 }}>
+            <Orb size={92} state="idle" />
+            <Text style={{ fontFamily: font.display, fontSize: 40, color: c.text, letterSpacing: -0.8, marginTop: 16 }}>Aura</Text>
+            <Text style={{ fontFamily: font.body, fontSize: 15, lineHeight: 22, color: c.muted, textAlign: "center", marginTop: 6 }}>the personal ai that remembers what matters.</Text>
+          </View>
+          {mode === "signup" ? (
+            <TextInput style={authInputStyle} value={name} onChangeText={setName} placeholder="your name" placeholderTextColor={c.muted} autoCapitalize="words" />
+          ) : null}
+          <TextInput style={authInputStyle} value={email} onChangeText={setEmail} placeholder="email" placeholderTextColor={c.muted} autoCapitalize="none" keyboardType="email-address" autoCorrect={false} />
+          <TextInput style={authInputStyle} value={pw} onChangeText={setPw} placeholder="password" placeholderTextColor={c.muted} secureTextEntry />
+          {err ? <Text style={{ color: "#C96E68", fontFamily: font.medium, fontSize: 13, marginBottom: 8, marginLeft: 4 }}>{err}</Text> : null}
+          <Pressable onPress={submit} disabled={busy} style={({ pressed }) => [{ backgroundColor: c.accent, height: 54, borderRadius: 14, alignItems: "center", justifyContent: "center", marginTop: 4 }, pressed && { opacity: 0.9 }]}>
+            {busy ? <ActivityIndicator color={c.bg} /> : <Text style={{ fontFamily: font.semibold, fontSize: 16, color: c.bg }}>{mode === "login" ? "log in" : "create account"}</Text>}
+          </Pressable>
+          <Pressable onPress={() => { setErr(""); setMode(mode === "login" ? "signup" : "login"); }} hitSlop={10} style={{ marginTop: 20, alignItems: "center" }}>
+            <Text style={{ fontFamily: font.medium, fontSize: 14, color: c.muted }}>{mode === "login" ? "new here? create an account" : "have an account? log in"}</Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+export default function Root() {
+  const [authed, setAuthed] = useState<boolean | null>(null);
+  useEffect(() => { loadSession().then((ok) => setAuthed(ok)).catch(() => setAuthed(false)); }, []);
+  if (authed === null) return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: c.bg }}><Orb size={110} state="idle" /></View>;
+  if (!authed) return <AuthGate onAuthed={() => setAuthed(true)} />;
+  return <AuraApp onSignOut={() => setAuthed(false)} />;
+}

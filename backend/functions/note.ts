@@ -10,8 +10,9 @@ async function hydraIngest(base: string, key: string, user: string, text: string
 export default async function handler(req: Request, ctx: any): Promise<Response> {
   if (req.method === "OPTIONS") return json({ ok: true });
   try {
+    const userId = ctx.user?.id;
+    if (!userId) return json({ error: "unauthorized" }, 401);
     const body = await req.json().catch(() => ({}));
-    const userId = body.user_id || "demo";
     const text = (body.text || "").toString().trim();
     if (!text) return json({ error: "text required" }, 400);
     const { HYDRA_DB_API_KEY } = ctx.env; const HYDRA_BASE = ctx.env.HYDRA_BASE || "https://api.hydradb.com";

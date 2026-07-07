@@ -39,8 +39,9 @@ async function recall(ctx: any, userId: string, q: string, like: string[]): Prom
 export default async function handler(req: Request, ctx: any): Promise<Response> {
   if (req.method === "OPTIONS") return json({ ok: true });
   try {
+    const userId = ctx.user?.id;
+    if (!userId) return json({ error: "unauthorized" }, 401);
     const body = await req.json().catch(() => ({}));
-    const userId = body.user_id || "demo";
     const scenario = body.scenario;
     const { BUTTERBASE_APP_ID, BUTTERBASE_API_URL, BUTTERBASE_API_KEY } = ctx.env;
 

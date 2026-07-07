@@ -4,6 +4,7 @@ function json(d: any, s = 200): Response {
 export default async function handler(req: Request, ctx: any): Promise<Response> {
   if (req.method === "OPTIONS") return json({ ok: true });
   try {
+    if (!ctx.user?.id) return json({ error: "unauthorized" }, 401);
     const body = await req.json().catch(() => ({}));
     const b64 = body.audio_base64;
     if (!b64) return json({ error: "audio_base64 required" }, 400);
