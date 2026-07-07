@@ -20,6 +20,7 @@ import { Feather } from "@expo/vector-icons";
 import Orb from "./components/Orb";
 import BrandIcon from "./components/BrandIcon";
 import MicButton from "./components/MicButton";
+import Onboarding from "./components/Onboarding";
 import { c, font, layout, r, shadow, sp, type as ty } from "./theme";
 import { addNote, agent, approve, Card, clearChat, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getSubscription, GraphPerson, loadSession, login, logout, Memory, Message, PromiseItem, setLocation, signup, simulate, subscribe, syncEmail } from "./lib/api";
 
@@ -1091,7 +1092,7 @@ const s = StyleSheet.create({
 
 const authInputStyle: any = { backgroundColor: c.surface, borderWidth: 1, borderColor: c.hairline, borderRadius: 14, paddingHorizontal: 16, height: 54, fontFamily: font.body, fontSize: 16, color: c.text, marginBottom: 12 };
 
-function AuthGate({ onAuthed }: { onAuthed: () => void }) {
+function AuthGate({ onAuthed }: { onAuthed: (isNew: boolean) => void }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -1104,7 +1105,7 @@ function AuthGate({ onAuthed }: { onAuthed: () => void }) {
     setBusy(true); setErr("");
     const res = mode === "login" ? await login(email, pw) : await signup(email, pw, name);
     setBusy(false);
-    if (res.ok) onAuthed(); else setErr(res.error || "something went wrong.");
+    if (res.ok) onAuthed(mode === "signup"); else setErr(res.error || "something went wrong.");
   };
   return (
     <SafeAreaView style={[s.fill, { backgroundColor: c.bg }]}>
@@ -1136,8 +1137,10 @@ function AuthGate({ onAuthed }: { onAuthed: () => void }) {
 
 export default function Root() {
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [onboarding, setOnboarding] = useState(false);
   useEffect(() => { loadSession().then((ok) => setAuthed(ok)).catch(() => setAuthed(false)); }, []);
   if (authed === null) return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: c.bg }}><Orb size={110} state="idle" /></View>;
-  if (!authed) return <AuthGate onAuthed={() => setAuthed(true)} />;
-  return <AuraApp onSignOut={() => setAuthed(false)} />;
+  if (!authed) return <AuthGate onAuthed={(isNew) => { setOnboarding(isNew); setAuthed(true); }} />;
+  if (onboarding) return <Onboarding onDone={() => setOnboarding(false)} />;
+  return <AuraApp onSignOut={() => { setOnboarding(false); setAuthed(false); }} />;
 }
