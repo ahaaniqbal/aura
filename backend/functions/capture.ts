@@ -58,12 +58,13 @@ ${text.slice(0, 4500)}
 """
 return STRICT json only, all lowercase, no em dashes:
 {
- "people":[{"name":str,"relation":"family"|"friend"|"client"|"collaborator"|"partner"|null,"note":str,"birthday":"MM-DD or null"}],
+ "people":[{"name":str,"relation":"family"|"friend"|"client"|"collaborator"|"partner"|null,"note":str,"birthday":"MM-DD or null","wants":[str]}],
  "promises":[{"text":str,"person":str_or_null,"direction":"i_owe"|"owed_to_me"|null,"due":"YYYY-MM-DD, a weekday, or null"}],
  "care":[{"person":str,"note":str}],
  "summary":str
 }
 notes:
+- "wants" is gift and preference memory: anything a person mentioned wanting, wishing for, loving, saving up for, or needing, a concrete thing you could later help get them. only include real, specific wants, else an empty array.
 - "care" is the emotional weight: someone stressed, sick, grieving, moving, celebrating, anything the user should hold gently.
 - "summary" is one warm paragraph to the user: what you caught, and what matters, in aura's voice.
 - if nothing relevant, use empty arrays and a short honest summary.`;

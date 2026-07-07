@@ -24,6 +24,7 @@ import { c, font, grad, layout, r, shadow, sp, type as ty } from "./theme";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Line } from "react-native-svg";
 import Avatar from "./components/Avatar";
+import PersonSheet from "./components/PersonSheet";
 import CaptureMoment from "./components/CaptureMoment";
 import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getSubscription, GraphPerson, loadSession, login, logout, Memory, Message, PromiseItem, registerDevice, setLocation, signup, simulate, subscribe, syncEmail } from "./lib/api";
 
@@ -170,8 +171,8 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   const homeCapture = async (text: string) => {
     const t = text.trim(); if (!t) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setBusy(true);
-    try { await agent(t, "home"); await refresh(); await loadGraph(); } finally { setBusy(false); }
+    setTab("chat"); setBusy(true); setThinking(true);
+    try { await agent(t, "home"); await refresh(); await loadGraph(); } finally { setThinking(false); setBusy(false); }
   };
   const donePromise = async (text: string) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -362,7 +363,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
         </KeyboardAvoidingView>
       )}
 
-      {tab === "people" && <PeopleView people={graph.people} promises={graph.promises} onRefresh={loadGraph} isPro={isPro} onUpgrade={() => setPayOpen(true)} onBrief={briefFlow} onSignOut={signOut} />}
+      {tab === "people" && <PeopleView people={graph.people} promises={graph.promises} onRefresh={loadGraph} onAct={homeCapture} isPro={isPro} onUpgrade={() => setPayOpen(true)} onBrief={briefFlow} onSignOut={signOut} />}
       {tab === "notes" && <NotesView notes={notes} onAdd={addNoteFlow} busy={busy} />}
       {tab === "connect" && <ConnectView serverConnected={serverConnected} onConnect={connectFlow} />}
 
@@ -706,15 +707,29 @@ function HomeView({ promises, people, busy, onCapture, onDone, onBrief, onRecord
   });
   const bN = people.map((p) => ({ p, d: daysUntilBirthday(p.birthday) })).filter((x) => x.d !== null && (x.d as number) <= 21).map(({ p, d }) => {
     const days = d as number; const label = days === 0 ? "today!" : days === 1 ? "tomorrow" : `in ${days} days`;
-    return { key: "b:" + p.person, person: p.person, title: `${p.person}'s birthday`, body: p.relation ? `your ${p.relation}` : "coming up",
-      chip: { label, bg: c.pink, fg: "#fff" }, ring: c.pink, glow: true, rank: days, actBg: c.pink, icon: "gift", action: () => onCapture(`help me send a warm birthday message to ${p.person}`) };
+    const wants = (p.wants || []).filter(Boolean);
+    const body = wants.length ? `they mentioned wanting ${wants.slice(0, 2).join(", ")}` : (p.relation ? `your ${p.relation}` : "coming up");
+    const action = wants.length
+      ? () => onCapture(`help me get ${p.person} a birthday gift. they've mentioned wanting: ${wants.join(", ")}. suggest something thoughtful and offer to handle it for me.`)
+      : () => onCapture(`help me send a warm birthday message to ${p.person}`);
+    return { key: "b:" + p.person, person: p.person, title: `${p.person}'s birthday`, body,
+      chip: { label, bg: c.pink, fg: "#fff" }, ring: c.pink, glow: true, rank: days, actBg: c.pink, icon: "gift", action };
   });
   const cN = people.filter((p) => p.care && p.care_at && (Date.now() - Number(p.care_at) < 30 * 86400000)).slice(0, 3).map((p) => ({
     key: "c:" + p.person, person: p.person, title: `check in on ${p.person}`, body: String(p.care || ""),
     chip: { label: "needs you", bg: c.pink, fg: "#fff" }, ring: c.pink, glow: true, rank: -12,
     actBg: c.pink, icon: "heart", action: () => onCapture(`help me reach out warmly to ${p.person}. what's going on: ${p.care}`),
   }));
-  const nudges = [...cN, ...pN, ...bN].sort((a, b) => a.rank - b.rank).slice(0, 6);
+  // social connector: gently resurface people you've drifted from, so no one important goes quiet
+  const surfaced = new Set([...cN, ...pN, ...bN].map((n) => String(n.person || "").toLowerCase()));
+  const rN = people.filter((p) => /family|friend|partner/i.test(p.relation || "") && !surfaced.has(String(p.person).toLowerCase()) && Number(p.updated_at) && (Date.now() - Number(p.updated_at)) >= 30 * 86400000)
+    .sort((a, b) => Number(a.updated_at) - Number(b.updated_at)).slice(0, 2).map((p) => {
+      const wk = Math.max(1, Math.round((Date.now() - Number(p.updated_at)) / (7 * 86400000)));
+      return { key: "r:" + p.person, person: p.person, title: `reconnect with ${p.person}`, body: `it's been ${wk} ${wk === 1 ? "week" : "weeks"} since you caught up`,
+        chip: { label: p.relation || "reach out", bg: c.blue, fg: "#fff" }, ring: c.blue, glow: false, rank: 6, actBg: c.blue, icon: "message-circle",
+        action: () => onCapture(`help me reconnect with ${p.person}, it's been a while. draft a warm, low pressure message to pick things back up.`) };
+    });
+  const nudges = [...cN, ...rN, ...pN, ...bN].sort((a, b) => a.rank - b.rank).slice(0, 6);
   return (
     <View style={s.fill}>
       <LinearGradient colors={grad.today as any} locations={[0, 0.34, 0.64]} style={StyleSheet.absoluteFill} />
@@ -810,8 +825,9 @@ function Float({ i, children }: { i: number; children: React.ReactNode }) {
   const ty = a.interpolate({ inputRange: [0, 1], outputRange: [0, i % 2 ? 7 : -7] });
   return <Animated.View style={{ transform: [{ translateY: ty }] }}>{children}</Animated.View>;
 }
-function PeopleView({ people, onRefresh, isPro, onUpgrade, onBrief, onSignOut }: { people: GraphPerson[]; promises: PromiseItem[]; onRefresh: () => Promise<void> | void; isPro: boolean; onUpgrade: () => void; onBrief: () => void; onSignOut: () => void }) {
+function PeopleView({ people, onRefresh, onAct, isPro, onUpgrade, onBrief, onSignOut }: { people: GraphPerson[]; promises: PromiseItem[]; onRefresh: () => Promise<void> | void; onAct: (t: string) => void; isPro: boolean; onUpgrade: () => void; onBrief: () => void; onSignOut: () => void }) {
   useEffect(() => { onRefresh(); }, []);
+  const [sel, setSel] = useState<GraphPerson | null>(null);
   const shown = people.slice(0, 8);
   const need = people.filter((p) => { const b = daysUntilBirthday(p.birthday); return (b !== null && b <= 21) || !!(p.open_promises && p.open_promises.length); }).length;
   const score = people.length ? Math.max(38, 98 - need * 7) : 100;
@@ -845,9 +861,11 @@ function PeopleView({ people, onRefresh, isPro, onUpgrade, onBrief, onSignOut }:
               const st = bsoon ? `🎂 ${b === 0 ? "today" : b + "d"}` : owes ? "you owe" : (p.relation || "");
               return (
                 <View key={p.person} style={[cs.node, { left: `${SLOTS[i].x}%`, top: `${SLOTS[i].y}%`, marginLeft: -46, marginTop: -size / 2 }]}>
-                  <Float i={i}><Avatar name={p.person} size={size} ring={ring} glow={bsoon} /></Float>
-                  <Text style={cs.nm} numberOfLines={1}>{p.person}</Text>
-                  {st ? <Text style={cs.st} numberOfLines={1}>{st}</Text> : null}
+                  <Press onPress={() => setSel(p)} style={{ alignItems: "center" }}>
+                    <Float i={i}><Avatar name={p.person} size={size} ring={ring} glow={bsoon} /></Float>
+                    <Text style={cs.nm} numberOfLines={1}>{p.person}</Text>
+                    {st ? <Text style={cs.st} numberOfLines={1}>{st}</Text> : null}
+                  </Press>
                 </View>
               );
             })}
@@ -865,6 +883,7 @@ function PeopleView({ people, onRefresh, isPro, onUpgrade, onBrief, onSignOut }:
           : <Press style={cs.pill} onPress={onUpgrade}><Text style={cs.pillTxt}>✦ Pro</Text></Press>}
         <Press style={cs.iconPill} onPress={onSignOut} hitSlop={8}><Feather name="log-out" size={15} color="#fff" /></Press>
       </View>
+      <PersonSheet person={sel} onClose={() => setSel(null)} onAct={onAct} />
     </View>
   );
 }

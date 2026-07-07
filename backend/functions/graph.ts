@@ -45,6 +45,7 @@ SET person.note = coalesce(p.note, person.note),
     person.relation = coalesce(p.relation, person.relation),
     person.care = coalesce(p.care, person.care),
     person.care_at = CASE WHEN p.care IS NOT NULL AND p.care <> '' THEN timestamp() ELSE person.care_at END,
+    person.wants = coalesce(person.wants, []) + [x IN coalesce(p.wants, []) WHERE NOT x IN coalesce(person.wants, [])],
     person.updated_at = timestamp()
 MERGE (u)-[:KNOWS]->(person)
 FOREACH (topic IN coalesce(p.topics, []) |
@@ -84,7 +85,7 @@ WHERE toLower(p.name) CONTAINS toLower($q)
    OR EXISTS { MATCH (p)-[:INTERESTED_IN]->(t:Topic) WHERE toLower(t.name) CONTAINS toLower($q) }
 OPTIONAL MATCH (p)-[:INTERESTED_IN]->(t:Topic)
 OPTIONAL MATCH (pr:Promise)-[:TO]->(p) WHERE pr.status = 'open'
-RETURN p.name AS name, p.note AS note, p.org AS org, p.relation AS relation, p.birthday AS birthday, p.care AS care,
+RETURN p.name AS name, p.note AS note, p.org AS org, p.relation AS relation, p.birthday AS birthday, p.care AS care, coalesce(p.wants, []) AS wants,
        collect(DISTINCT t.name) AS topics, collect(DISTINCT pr.text) AS open_promises
 LIMIT 12`;
 
@@ -110,7 +111,7 @@ const Q_SUBGRAPH = `
 MATCH (u:User {id:$uid})-[:KNOWS]->(p:Person)
 OPTIONAL MATCH (p)-[:INTERESTED_IN]->(t:Topic)
 OPTIONAL MATCH (u)-[:MADE]->(pr:Promise)-[:TO]->(p) WHERE pr.status = 'open'
-RETURN p.name AS person, p.org AS org, p.relation AS relation, p.birthday AS birthday, p.care AS care, p.care_at AS care_at,
+RETURN p.name AS person, p.org AS org, p.relation AS relation, p.birthday AS birthday, p.care AS care, p.care_at AS care_at, coalesce(p.wants, []) AS wants, p.updated_at AS updated_at,
        collect(DISTINCT t.name) AS topics, collect(DISTINCT pr.text) AS open_promises
 LIMIT 200`;
 

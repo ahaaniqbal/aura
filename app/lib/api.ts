@@ -134,7 +134,7 @@ export const getConnections = async (): Promise<string[]> => {
 };
 
 // ---------------- relationship graph (Neo4j) ----------------
-export type GraphPerson = { person: string; org: string | null; relation: string | null; birthday: string | null; care: string | null; care_at: number | null; topics: string[]; open_promises: string[] };
+export type GraphPerson = { person: string; org: string | null; relation: string | null; birthday: string | null; care: string | null; care_at: number | null; wants: string[]; updated_at: number | null; topics: string[]; open_promises: string[] };
 export type PromiseItem = { text: string; person: string | null; direction: string | null; due: string | null };
 export const getGraph = async (): Promise<{ people: GraphPerson[]; promises: PromiseItem[] }> => {
   try {
