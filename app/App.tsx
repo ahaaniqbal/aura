@@ -196,7 +196,8 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   };
   const donePromise = async (text: string) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    try { await closePromise(text); await loadGraph(); } catch (e) {}
+    // fetch first, then animate the resolved nudge sliding away as the list settles
+    try { await closePromise(text); const g = await getGraph(); ease(); setGraph(g); } catch (e) {}
   };
   const act = async (card: Card, decision: "approve" | "decline") => {
     if (!card.action_id) return;
@@ -393,20 +394,15 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
       {tab === "connect" && <ConnectView serverConnected={serverConnected} onConnect={connectFlow} />}
 
       <View style={s.tabBar}>
-        {TABS.map(({ key, icon, label }) => {
-          const active = tab === key;
-          return (
-            <Press
-              key={key}
-              onPress={() => { Haptics.selectionAsync().catch(() => {}); ease(); setTab(key); }}
-              style={s.tab}
-            >
-              <Feather name={icon as any} size={20} color={active ? c.accent : c.muted} />
-              <Text style={[s.tabLabel, active && s.tabLabelActive]}>{label}</Text>
-              {active ? <View style={s.tabIndicator} /> : null}
-            </Press>
-          );
-        })}
+        {TABS.map(({ key, icon, label }) => (
+          <TabItem
+            key={key}
+            icon={icon}
+            label={label}
+            active={tab === key}
+            onPress={() => { Haptics.selectionAsync().catch(() => {}); ease(); setTab(key); }}
+          />
+        ))}
       </View>
 
       <Modal visible={demoOpen} transparent animationType="fade" onRequestClose={() => setDemoOpen(false)}>
@@ -486,6 +482,23 @@ function Press({ children, onPress, disabled, style, scaleTo = 0.96, hitSlop }: 
     >
       {children}
     </AnimatedPressable>
+  );
+}
+
+// Tab item with a spring pop on the icon and a fading/scaling underline when it becomes active.
+function TabItem({ icon, label, active, onPress }: { icon: string; label: string; active: boolean; onPress: () => void }) {
+  const a = useRef(new Animated.Value(active ? 1 : 0)).current;
+  useEffect(() => { Animated.spring(a, { toValue: active ? 1 : 0, useNativeDriver: true, friction: 6, tension: 150 }).start(); }, [active]);
+  const iconScale = a.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
+  const lift = a.interpolate({ inputRange: [0, 1], outputRange: [0, -2] });
+  return (
+    <Press onPress={onPress} style={s.tab}>
+      <Animated.View style={{ transform: [{ scale: iconScale }, { translateY: lift }] }}>
+        <Feather name={icon as any} size={20} color={active ? c.accent : c.muted} />
+      </Animated.View>
+      <Text style={[s.tabLabel, active && s.tabLabelActive]}>{label}</Text>
+      <Animated.View style={[s.tabIndicator, { opacity: a, transform: [{ scaleX: a }] }]} />
+    </Press>
   );
 }
 
@@ -860,6 +873,14 @@ function PeopleView({ people, onRefresh, onAct, onAdd, isPro, onUpgrade, onBrief
   const shown = [...people].sort((a, b) => closeness(b) - closeness(a)).slice(0, 8);
   const need = people.filter((p) => { const b = daysUntilBirthday(p.birthday); return (b !== null && b <= 21) || !!(p.open_promises && p.open_promises.length) || isDrifting(p); }).length;
   const score = people.length ? Math.max(38, 98 - need * 7) : 100;
+  // the health score counts up when the constellation opens
+  const [shownScore, setShownScore] = useState(0);
+  const scoreAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const id = scoreAnim.addListener(({ value }) => setShownScore(Math.round(value)));
+    Animated.timing(scoreAnim, { toValue: score, duration: 900, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+    return () => scoreAnim.removeListener(id);
+  }, [score]);
   const cx = 50, cy = 47;
   return (
     <View style={s.fill}>
@@ -869,7 +890,7 @@ function PeopleView({ people, onRefresh, onAct, onAdd, isPro, onUpgrade, onBrief
           <Text style={cs.h}>your circle</Text>
           <Text style={cs.hSub}>{people.length} {people.length === 1 ? "person" : "people"}{need ? ` · ${need} need you` : ""}</Text>
         </View>
-        <View style={cs.health}><Text style={cs.healthN}>{score}</Text><Text style={cs.healthL}>health</Text></View>
+        <View style={cs.health}><Text style={cs.healthN}>{shownScore}</Text><Text style={cs.healthL}>health</Text></View>
       </View>
       <View style={cs.canvas}>
         {people.length === 0 ? (
