@@ -127,6 +127,21 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   const onPulse = useCallback(async (v: number, mood: string) => {
     try { await logPulse(v, mood); await loadPulse(); } catch (e) {}
   }, [loadPulse]);
+  // report the current device timezone (any IANA zone worldwide). re-run on foreground so travel updates it.
+  const reportTimezone = useCallback(() => {
+    try { const tz = Intl.DateTimeFormat().resolvedOptions().timeZone; if (tz) setTimezone(tz).catch(() => {}); } catch (e) {}
+  }, []);
+  // refresh current location without re-prompting (only if already granted); catches travel too.
+  const refreshLocation = useCallback(async () => {
+    try {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== "granted") return;
+      const pos = await Location.getCurrentPositionAsync({});
+      const geo = await Location.reverseGeocodeAsync({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+      const place = geo[0]?.district || geo[0]?.city || geo[0]?.subregion || "nearby";
+      await setLocation(pos.coords.latitude, pos.coords.longitude, place);
+    } catch (e) { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -142,8 +157,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
     getConnections().then(setServerConnected).catch(() => {});
     loadGraph();
     loadPulse();
-    // report the device's timezone so briefings/nudges arrive at your local morning, not a fixed server hour
-    try { const tz = Intl.DateTimeFormat().resolvedOptions().timeZone; if (tz) setTimezone(tz).catch(() => {}); } catch (e) {}
+    reportTimezone();
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -155,6 +169,13 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
       } catch (e) { /* ignore */ }
     })();
   }, [refresh]);
+
+  // Re-detect timezone + location whenever Aura returns to the foreground, so travel (say SF to
+  // NYC) updates your local time and place without needing a cold restart.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (st) => { if (st === "active") { reportTimezone(); refreshLocation(); } });
+    return () => sub.remove();
+  }, [reportTimezone, refreshLocation]);
 
   // Live refresh only where it matters (chat needs fast liveness; today a gentler beat),
   // paused on other tabs and whenever the app is backgrounded, to spare battery + backend.
