@@ -22,7 +22,7 @@ import BrandIcon from "./components/BrandIcon";
 import MicButton from "./components/MicButton";
 import Onboarding from "./components/Onboarding";
 import { c, font, layout, r, shadow, sp, type as ty } from "./theme";
-import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getSubscription, GraphPerson, loadSession, login, logout, Memory, Message, PromiseItem, setLocation, signup, simulate, subscribe, syncEmail } from "./lib/api";
+import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getSubscription, GraphPerson, loadSession, login, logout, Memory, Message, PromiseItem, registerDevice, setLocation, signup, simulate, subscribe, syncEmail } from "./lib/api";
 
 const INPUT_LINE_H = 22;
 const INPUT_MAX_H = 120;
@@ -115,7 +115,15 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   }, []);
 
   useEffect(() => {
-    Notifications.requestPermissionsAsync().catch(() => {});
+    (async () => {
+      try {
+        let g = (await Notifications.getPermissionsAsync()).granted;
+        if (!g) g = (await Notifications.requestPermissionsAsync()).granted;
+        if (!g) return;
+        const t = await Notifications.getExpoPushTokenAsync();
+        if (t?.data) await registerDevice(t.data, Platform.OS);
+      } catch (e) { /* push token needs a dev build; no-op in Expo Go */ }
+    })();
     refresh();
     getConnections().then(setServerConnected).catch(() => {});
     loadGraph();
@@ -642,6 +650,22 @@ function greeting(): string {
   return "good evening";
 }
 const MM = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+function fmtBday(b: string): string {
+  const parts = String(b).split("-").map((x) => parseInt(x, 10)).filter((n) => !isNaN(n));
+  if (parts.length < 2) return b;
+  return `${MM[parts[parts.length - 2] - 1] || "?"} ${parts[parts.length - 1]}`;
+}
+function daysUntilBirthday(bday?: string | null): number | null {
+  if (!bday) return null;
+  const parts = String(bday).split("-").map((x) => parseInt(x, 10)).filter((n) => !isNaN(n));
+  if (parts.length < 2) return null;
+  const month = parts[parts.length - 2], day = parts[parts.length - 1];
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  let next = new Date(now.getFullYear(), month - 1, day);
+  if (next.getTime() < now.getTime()) next = new Date(now.getFullYear() + 1, month - 1, day);
+  return Math.round((next.getTime() - now.getTime()) / 86400000);
+}
 function dueMeta(due: string | null): { label: string; tone: "over" | "soon" | "later"; rank: number } | null {
   if (!due) return null;
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(due);
@@ -660,16 +684,22 @@ function dueMeta(due: string | null): { label: string; tone: "over" | "soon" | "
 function HomeView({ promises, people, busy, onCapture, onDone, onBrief }: { promises: PromiseItem[]; people: GraphPerson[]; busy: boolean; onCapture: (t: string) => void; onDone: (text: string) => void; onBrief: () => void }) {
   const [q, setQ] = useState("");
   const submit = () => { if (!q.trim()) return; onCapture(q); setQ(""); };
-  const nudges = promises
-    .map((p) => ({ p, meta: dueMeta(p.due) }))
-    .sort((a, b) => (a.meta?.rank ?? 9999) - (b.meta?.rank ?? 9999))
-    .slice(0, 6);
+  const promiseNudges = promises.map((p) => {
+    const meta = dueMeta(p.due);
+    return { key: "p:" + p.text + (p.person || ""), person: p.person || "someone", title: p.direction === "owed_to_me" ? `${p.person || "someone"} owes you` : `for ${p.person || "someone"}`, body: p.text, meta, rank: meta?.rank ?? 9999, action: () => onDone(p.text), icon: "check", iconColor: c.success };
+  });
+  const bdayNudges = people.map((p) => ({ p, days: daysUntilBirthday(p.birthday) })).filter((x) => x.days !== null && (x.days as number) <= 21).map(({ p, days }) => {
+    const d = days as number;
+    const label = d === 0 ? "today" : d === 1 ? "tomorrow" : `in ${d} days`;
+    return { key: "b:" + p.person, person: p.person, title: `${p.person}'s birthday`, body: p.relation ? `your ${p.relation}` : "coming up", meta: { label, tone: (d <= 1 ? "over" : "soon") as "over" | "soon" | "later", rank: d }, rank: d, action: () => onCapture(`help me send a warm birthday message to ${p.person}`), icon: "gift", iconColor: c.accent };
+  });
+  const nudges = [...promiseNudges, ...bdayNudges].sort((a, b) => a.rank - b.rank).slice(0, 6);
   return (
     <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
       <ScrollView style={s.fill} contentContainerStyle={s.pageScroll} keyboardShouldPersistTaps="handled">
         <View style={s.homeHead}>
           <Text style={s.homeGreet}>{greeting()}.</Text>
-          <Text style={s.homeSub}>{promises.length ? "here's who needs you today." : `you're keeping track of ${people.length} ${people.length === 1 ? "person" : "people"}.`}</Text>
+          <Text style={s.homeSub}>{nudges.length ? "here's who needs you today." : `you're keeping track of ${people.length} ${people.length === 1 ? "person" : "people"}.`}</Text>
         </View>
 
         <View style={s.homeCapture}>
@@ -688,20 +718,20 @@ function HomeView({ promises, people, busy, onCapture, onDone, onBrief }: { prom
               <Text style={s.sectionLabel}>Who needs you</Text>
               <Press onPress={onBrief} hitSlop={8}><Text style={s.homeBriefLink}>daily brief</Text></Press>
             </View>
-            {nudges.map(({ p, meta }, i) => (
-              <FadeInUp key={i}>
+            {nudges.map((n) => (
+              <FadeInUp key={n.key}>
                 <View style={s.nudge}>
-                  <View style={s.nudgeAvatar}><Text style={s.nudgeInitial}>{(p.person || "?").trim().charAt(0).toUpperCase()}</Text></View>
+                  <View style={s.nudgeAvatar}><Text style={s.nudgeInitial}>{(n.person || "?").trim().charAt(0).toUpperCase()}</Text></View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.nudgeTitle}>{p.direction === "owed_to_me" ? `${p.person || "someone"} owes you` : `for ${p.person || "someone"}`}</Text>
-                    <Text style={s.nudgeBody}>{p.text}</Text>
-                    {meta ? (
-                      <View style={[s.nudgeChip, meta.tone === "over" && s.nudgeChipOver, meta.tone === "soon" && s.nudgeChipSoon]}>
-                        <Text style={[s.nudgeChipTxt, meta.tone === "over" && s.nudgeChipTxtOver, meta.tone === "soon" && s.nudgeChipTxtSoon]}>{meta.label}</Text>
+                    <Text style={s.nudgeTitle}>{n.title}</Text>
+                    <Text style={s.nudgeBody}>{n.body}</Text>
+                    {n.meta ? (
+                      <View style={[s.nudgeChip, n.meta.tone === "over" && s.nudgeChipOver, n.meta.tone === "soon" && s.nudgeChipSoon]}>
+                        <Text style={[s.nudgeChipTxt, n.meta.tone === "over" && s.nudgeChipTxtOver, n.meta.tone === "soon" && s.nudgeChipTxtSoon]}>{n.meta.label}</Text>
                       </View>
                     ) : null}
                   </View>
-                  <Press onPress={() => onDone(p.text)} hitSlop={8} style={s.nudgeDone}><Feather name="check" size={18} color={c.success} /></Press>
+                  <Press onPress={n.action} hitSlop={8} style={s.nudgeDone}><Feather name={n.icon as any} size={18} color={n.iconColor} /></Press>
                 </View>
               </FadeInUp>
             ))}
@@ -774,7 +804,8 @@ function PeopleView({ people, promises, onRefresh, isPro, onUpgrade, onBrief, on
               <View style={s.personAvatar}><Text style={s.personInitial}>{(p.person || "?").trim().charAt(0).toUpperCase()}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={s.personName}>{p.person}</Text>
-                {p.org ? <Text style={s.personOrg}>{p.org}</Text> : null}
+                {(p.relation || p.org) ? <Text style={s.personOrg}>{[p.relation, p.org].filter(Boolean).join(" · ")}</Text> : null}
+                {p.birthday ? <View style={s.bdayRow}><Feather name="gift" size={11} color={c.muted} /><Text style={s.bdayTxt}>{fmtBday(p.birthday)}</Text></View> : null}
                 {p.topics && p.topics.filter(Boolean).length ? (
                   <View style={s.topicRow}>
                     {p.topics.filter(Boolean).map((t) => (
@@ -1195,6 +1226,8 @@ const s = StyleSheet.create({
   nudgeDone: { width: 34, height: 34, borderRadius: 17, borderWidth: StyleSheet.hairlineWidth, borderColor: c.hairline, backgroundColor: c.bg, alignItems: "center", justifyContent: "center" },
   homeEmpty: { alignItems: "center", gap: sp.m, paddingVertical: sp.xl, paddingHorizontal: sp.l },
   homeEmptyTxt: { fontFamily: font.body, fontSize: ty.subhead, color: c.muted, textAlign: "center", lineHeight: 22 },
+  bdayRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 },
+  bdayTxt: { fontFamily: font.medium, fontSize: ty.caption, color: c.muted },
 
   payHeader: { flexDirection: "row", alignItems: "center", gap: sp.s, marginBottom: sp.s },
   payTitle: { fontFamily: font.display, fontSize: ty.h1, color: c.text, letterSpacing: -0.4 },

@@ -2,7 +2,7 @@ const SYSTEM = `you are aura, a personal ambient agent with genuine taste and wa
 
 you are a real agent with tools. think step by step and use tools to fully handle the request before answering. do not ask the user to do things you can do yourself with a tool.
 
-your relationship graph is your living memory of the people in the user's life and the promises between them. whenever the user mentions a person, a detail about someone, or a commitment (something they owe, or that is owed to them), quietly call remember_person and add_promise so nothing is ever dropped. when they ask about someone, want an intro, ask "who do i know that...", or what they owe a person, use recall_people, who_knows, and open_promises. prefer the graph for anything about people or promises.
+your relationship graph is your living memory of the people in the user's life and the promises between them. whenever the user mentions a person, a detail about someone, or a commitment (something they owe, or that is owed to them), quietly call remember_person and add_promise so nothing is ever dropped. capture birthdays as MM-DD, and how each person relates to the user (family, friend, client, collaborator, partner) when it is clear. when they ask about someone, want an intro, ask "who do i know that...", or what they owe a person, use recall_people, who_knows, and open_promises. prefer the graph for anything about people or promises.
 
 reads are free: recall_memory, recall_people, who_knows, open_promises, search_inbox, get_calendar, list_tasks, get_context.
 anything outbound is NEVER done silently: you DRAFT or PROPOSE it as a card the user approves. use draft_email for replies and propose for buy/booking/etc.
@@ -14,7 +14,7 @@ respond with raw json only, never wrapped in markdown or backticks. each json ob
 tools:
 - recall_memory {"query": string}
 - save_memory {"text": string}
-- remember_person {"name": string, "note"?: string, "how_met"?: string, "org"?: string, "topics"?: string[]}
+- remember_person {"name": string, "note"?: string, "how_met"?: string, "org"?: string, "relation"?: "family"|"friend"|"client"|"collaborator"|"partner", "birthday"?: "MM-DD", "topics"?: string[]}
 - add_promise {"text": string, "person"?: string, "direction"?: "i_owe"|"owed_to_me", "due"?: string}
 - recall_people {"query": string}
 - open_promises {"person"?: string}
@@ -136,7 +136,7 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
           return "saved";
         }
         if (name === "remember_person") {
-          const p = { name: (args?.name || "").toString().trim(), note: args?.note, how_met: args?.how_met, org: args?.org, topics: Array.isArray(args?.topics) ? args.topics : (args?.topics ? [String(args.topics)] : []) };
+          const p = { name: (args?.name || "").toString().trim(), note: args?.note, how_met: args?.how_met, org: args?.org, birthday: args?.birthday, relation: args?.relation, topics: Array.isArray(args?.topics) ? args.topics : (args?.topics ? [String(args.topics)] : []) };
           if (!p.name) return "need a name";
           const r = await graphOp("ingest", { people: [p] });
           return r?.ok ? `remembered ${p.name} in your relationship graph` : "graph error: " + JSON.stringify(r).slice(0, 120);

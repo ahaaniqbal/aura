@@ -1,10 +1,6 @@
 // Aura's relationship graph, backed by Neo4j (HackwithBay 3.0 mandatory tech).
-// Every person you meet and every promise you make is a node; the agent reasons
-// over the connections with Cypher traversals a SQL join could not express.
-// JWT-secured: ctx.user.id scopes the whole graph, so users never see each other.
-// Talks to Neo4j Aura over the HTTP Query API v2 (no bolt driver in the worker runtime).
-// Env: NEO4J_QUERY_URL (https://<dbid>.databases.neo4j.io/db/neo4j/query/v2),
-//      NEO4J_USER (default "neo4j"), NEO4J_PASSWORD.
+// JWT-secured: ctx.user.id scopes the whole graph. Talks to Neo4j Aura over the
+// HTTP Query API v2 (no bolt driver in the worker runtime).
 
 function json(d: any, s = 200): Response {
   return new Response(JSON.stringify(d), { status: s, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
@@ -33,7 +29,6 @@ async function cypher(ctx: any, statement: string, parameters: any): Promise<any
   return values.map((row) => Object.fromEntries(fields.map((f, i) => [f, row[i]])));
 }
 
-// --- schema: constraints + composite indexes so MERGE stays cheap ---
 const SCHEMA = [
   "CREATE CONSTRAINT user_id IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE",
   "CREATE INDEX person_uid_name IF NOT EXISTS FOR (p:Person) ON (p.uid, p.name)",
@@ -41,7 +36,6 @@ const SCHEMA = [
   "CREATE INDEX promise_uid IF NOT EXISTS FOR (pr:Promise) ON (pr.uid)",
 ];
 
-// --- writes ---
 const Q_PEOPLE = `
 MERGE (u:User {id:$uid})
 WITH u
@@ -51,6 +45,8 @@ MERGE (person:Person {uid:$uid, name:p.name})
 SET person.note = coalesce(p.note, person.note),
     person.how_met = coalesce(p.how_met, person.how_met),
     person.org = coalesce(p.org, person.org),
+    person.birthday = coalesce(p.birthday, person.birthday),
+    person.relation = coalesce(p.relation, person.relation),
     person.updated_at = timestamp()
 MERGE (u)-[:KNOWS]->(person)
 FOREACH (topic IN coalesce(p.topics, []) |
@@ -81,16 +77,16 @@ MATCH (u:User {id:$uid})-[:MADE]->(pr:Promise {text:$text})
 SET pr.status = 'done', pr.closed_at = timestamp()
 RETURN pr.text AS text, pr.status AS status`;
 
-// --- reads (the agent's graph reasoning) ---
 const Q_RECALL = `
 MATCH (u:User {id:$uid})-[:KNOWS]->(p:Person)
 WHERE toLower(p.name) CONTAINS toLower($q)
    OR toLower(coalesce(p.note,'')) CONTAINS toLower($q)
    OR toLower(coalesce(p.org,'')) CONTAINS toLower($q)
+   OR toLower(coalesce(p.relation,'')) CONTAINS toLower($q)
    OR EXISTS { MATCH (p)-[:INTERESTED_IN]->(t:Topic) WHERE toLower(t.name) CONTAINS toLower($q) }
 OPTIONAL MATCH (p)-[:INTERESTED_IN]->(t:Topic)
 OPTIONAL MATCH (pr:Promise)-[:TO]->(p) WHERE pr.status = 'open'
-RETURN p.name AS name, p.note AS note, p.org AS org,
+RETURN p.name AS name, p.note AS note, p.org AS org, p.relation AS relation, p.birthday AS birthday,
        collect(DISTINCT t.name) AS topics, collect(DISTINCT pr.text) AS open_promises
 LIMIT 12`;
 
@@ -103,7 +99,6 @@ RETURN pr.text AS text, pr.direction AS direction, pr.due AS due, person.name AS
 ORDER BY coalesce(pr.due, '9999-99-99') ASC
 LIMIT 25`;
 
-// "who do I know into X / at org X" — a graph traversal, not a keyword scan
 const Q_WHO_KNOWS = `
 MATCH (u:User {id:$uid})-[:KNOWS]->(p:Person)
 WHERE EXISTS { MATCH (p)-[:INTERESTED_IN]->(t:Topic) WHERE toLower(t.name) CONTAINS toLower($topic) }
@@ -113,12 +108,11 @@ OPTIONAL MATCH (p)-[:INTERESTED_IN]->(t:Topic)
 RETURN p.name AS name, p.note AS note, p.org AS org, collect(DISTINCT t.name) AS topics
 LIMIT 12`;
 
-// full user subgraph, for the in-app graph view + the daily brief
 const Q_SUBGRAPH = `
 MATCH (u:User {id:$uid})-[:KNOWS]->(p:Person)
 OPTIONAL MATCH (p)-[:INTERESTED_IN]->(t:Topic)
 OPTIONAL MATCH (u)-[:MADE]->(pr:Promise)-[:TO]->(p) WHERE pr.status = 'open'
-RETURN p.name AS person, p.org AS org,
+RETURN p.name AS person, p.org AS org, p.relation AS relation, p.birthday AS birthday,
        collect(DISTINCT t.name) AS topics, collect(DISTINCT pr.text) AS open_promises
 LIMIT 200`;
 
