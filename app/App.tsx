@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator, Alert, Animated, Dimensions, Easing, KeyboardAvoidingView, LayoutAnimation, Modal, PanResponder, Platform, Pressable,
-  RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, UIManager, View,
+  SafeAreaView, ScrollView, StyleSheet, Text, TextInput, UIManager, View,
 } from "react-native";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -14,14 +14,16 @@ import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
 import * as Location from "expo-location";
 import { useFonts } from "expo-font";
-import { Fraunces_600SemiBold, Fraunces_500Medium, Fraunces_400Regular_Italic } from "@expo-google-fonts/fraunces";
-import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
+import { Nunito_400Regular, Nunito_500Medium, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold } from "@expo-google-fonts/nunito";
 import { Feather } from "@expo/vector-icons";
 import Orb from "./components/Orb";
 import BrandIcon from "./components/BrandIcon";
 import MicButton from "./components/MicButton";
 import Onboarding from "./components/Onboarding";
-import { c, font, layout, r, shadow, sp, type as ty } from "./theme";
+import { c, font, grad, layout, r, shadow, sp, type as ty } from "./theme";
+import { LinearGradient } from "expo-linear-gradient";
+import Svg, { Line } from "react-native-svg";
+import Avatar from "./components/Avatar";
 import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getSubscription, GraphPerson, loadSession, login, logout, Memory, Message, PromiseItem, registerDevice, setLocation, signup, simulate, subscribe, syncEmail } from "./lib/api";
 
 const INPUT_LINE_H = 22;
@@ -60,8 +62,7 @@ const TOOLS = [
 
 function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   const [loaded] = useFonts({
-    Fraunces_600SemiBold, Fraunces_500Medium, Fraunces_400Regular_Italic,
-    Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
+    Nunito_400Regular, Nunito_500Medium, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold,
   });
   const [feed, setFeed] = useState<Feed | null>(null);
   const [tab, setTab] = useState<"today" | "chat" | "people" | "notes" | "connect">("today");
@@ -275,8 +276,9 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   const isPro = feed?.entitlement?.tier === "pro";
 
   return (
-    <SafeAreaView style={[s.fill, { backgroundColor: c.bg }]}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[s.fill, { backgroundColor: (tab === "today" || tab === "people") ? "#6B54E8" : c.bg }]}>
+      <StatusBar style={(tab === "today" || tab === "people") ? "light" : "dark"} />
+      {!(tab === "today" || tab === "people") && (
       <View style={s.header}>
         <Orb size={32} state={headerState} />
         <View style={s.headerText}>
@@ -298,6 +300,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
           </Press>
         </View>
       </View>
+      )}
 
       {tab === "today" && <HomeView promises={graph.promises} people={graph.people} busy={busy} onCapture={homeCapture} onDone={donePromise} onBrief={briefFlow} />}
 
@@ -681,160 +684,195 @@ function dueMeta(due: string | null): { label: string; tone: "over" | "soon" | "
   return { label: nice, tone: "later", rank: days };
 }
 
+function Stat({ n, label }: { n: string; label: string }) {
+  return <View style={hs.stat}><Text style={hs.statN}>{n}</Text><Text style={hs.statL}>{label}</Text></View>;
+}
+function Chip({ label, bg, fg }: { label: string; bg: string; fg: string }) {
+  return <View style={[hs.chip, { backgroundColor: bg }]}><Text style={[hs.chipTxt, { color: fg }]}>{label}</Text></View>;
+}
 function HomeView({ promises, people, busy, onCapture, onDone, onBrief }: { promises: PromiseItem[]; people: GraphPerson[]; busy: boolean; onCapture: (t: string) => void; onDone: (text: string) => void; onBrief: () => void }) {
   const [q, setQ] = useState("");
   const submit = () => { if (!q.trim()) return; onCapture(q); setQ(""); };
-  const promiseNudges = promises.map((p) => {
-    const meta = dueMeta(p.due);
-    return { key: "p:" + p.text + (p.person || ""), person: p.person || "someone", title: p.direction === "owed_to_me" ? `${p.person || "someone"} owes you` : `for ${p.person || "someone"}`, body: p.text, meta, rank: meta?.rank ?? 9999, action: () => onDone(p.text), icon: "check", iconColor: c.success };
+  const pN = promises.map((p) => {
+    const meta = dueMeta(p.due); const over = !!meta && meta.tone === "over";
+    return { key: "p:" + p.text + (p.person || ""), person: p.person || "someone",
+      title: p.direction === "owed_to_me" ? `${p.person || "someone"} owes you` : `for ${p.person || "someone"}`, body: p.text,
+      chip: meta ? { label: meta.label, bg: over ? c.coral : c.chipBg, fg: over ? "#fff" : c.muted } : null,
+      ring: over ? c.coral : c.mint, glow: false, rank: meta ? meta.rank : 9999, actBg: c.mint, icon: "check", action: () => onDone(p.text) };
   });
-  const bdayNudges = people.map((p) => ({ p, days: daysUntilBirthday(p.birthday) })).filter((x) => x.days !== null && (x.days as number) <= 21).map(({ p, days }) => {
-    const d = days as number;
-    const label = d === 0 ? "today" : d === 1 ? "tomorrow" : `in ${d} days`;
-    return { key: "b:" + p.person, person: p.person, title: `${p.person}'s birthday`, body: p.relation ? `your ${p.relation}` : "coming up", meta: { label, tone: (d <= 1 ? "over" : "soon") as "over" | "soon" | "later", rank: d }, rank: d, action: () => onCapture(`help me send a warm birthday message to ${p.person}`), icon: "gift", iconColor: c.accent };
+  const bN = people.map((p) => ({ p, d: daysUntilBirthday(p.birthday) })).filter((x) => x.d !== null && (x.d as number) <= 21).map(({ p, d }) => {
+    const days = d as number; const label = days === 0 ? "today!" : days === 1 ? "tomorrow" : `in ${days} days`;
+    return { key: "b:" + p.person, person: p.person, title: `${p.person}'s birthday`, body: p.relation ? `your ${p.relation}` : "coming up",
+      chip: { label, bg: c.pink, fg: "#fff" }, ring: c.pink, glow: true, rank: days, actBg: c.pink, icon: "gift", action: () => onCapture(`help me send a warm birthday message to ${p.person}`) };
   });
-  const nudges = [...promiseNudges, ...bdayNudges].sort((a, b) => a.rank - b.rank).slice(0, 6);
+  const nudges = [...pN, ...bN].sort((a, b) => a.rank - b.rank).slice(0, 6);
   return (
-    <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
-      <ScrollView style={s.fill} contentContainerStyle={s.pageScroll} keyboardShouldPersistTaps="handled">
-        <View style={s.homeHead}>
-          <Text style={s.homeGreet}>{greeting()}.</Text>
-          <Text style={s.homeSub}>{nudges.length ? "here's who needs you today." : `you're keeping track of ${people.length} ${people.length === 1 ? "person" : "people"}.`}</Text>
-        </View>
-
-        <View style={s.homeCapture}>
-          <TextInput style={s.homeCaptureInput} value={q} onChangeText={setQ} placeholder="tell aura anything, a person, a promise, a plan…" placeholderTextColor={c.muted} multiline />
-          <View style={s.homeCaptureRow}>
-            <MicButton onResult={(t) => setQ((d) => (d ? d + " " + t : t))} disabled={busy} size={layout.controlSm} />
-            <Press onPress={submit} disabled={!q.trim() || busy} style={[s.homeCaptureBtn, !q.trim() && s.sendBtnOff]}>
-              {busy ? <ActivityIndicator color="#FFF" size="small" /> : <Feather name="arrow-up" size={18} color={q.trim() ? "#FFF" : c.muted} />}
-            </Press>
+    <View style={s.fill}>
+      <LinearGradient colors={grad.today as any} locations={[0, 0.34, 0.64]} style={StyleSheet.absoluteFill} />
+      <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
+        <ScrollView style={s.fill} contentContainerStyle={hs.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <Text style={hs.greet}>{greeting()}</Text>
+          <Text style={hs.sub}>{nudges.length ? `${nudges.length} ${nudges.length === 1 ? "thing needs" : "things need"} you today.` : "you're all caught up today."}</Text>
+          <View style={hs.statRow}>
+            <Stat n={String(people.length)} label="people" />
+            <Stat n={String(promises.length)} label="promises" />
+            <Stat n={String(bN.length)} label="birthdays" />
           </View>
-        </View>
-
-        {nudges.length ? (
-          <>
-            <View style={s.homeSectionRow}>
-              <Text style={s.sectionLabel}>Who needs you</Text>
-              <Press onPress={onBrief} hitSlop={8}><Text style={s.homeBriefLink}>daily brief</Text></Press>
+          <View style={hs.capture}>
+            <TextInput style={hs.captureInput} value={q} onChangeText={setQ} placeholder="tell aura anything…" placeholderTextColor="#9a94bd" multiline />
+            <View style={hs.captureRow}>
+              <MicButton onResult={(t) => setQ((d) => (d ? d + " " + t : t))} disabled={busy} size={38} />
+              <Press onPress={submit} disabled={!q.trim() || busy} style={[hs.send, !q.trim() && { opacity: 0.45 }]}>
+                {busy ? <ActivityIndicator color="#fff" size="small" /> : <Feather name="arrow-up" size={19} color="#fff" />}
+              </Press>
             </View>
-            {nudges.map((n) => (
-              <FadeInUp key={n.key}>
-                <View style={s.nudge}>
-                  <View style={s.nudgeAvatar}><Text style={s.nudgeInitial}>{(n.person || "?").trim().charAt(0).toUpperCase()}</Text></View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.nudgeTitle}>{n.title}</Text>
-                    <Text style={s.nudgeBody}>{n.body}</Text>
-                    {n.meta ? (
-                      <View style={[s.nudgeChip, n.meta.tone === "over" && s.nudgeChipOver, n.meta.tone === "soon" && s.nudgeChipSoon]}>
-                        <Text style={[s.nudgeChipTxt, n.meta.tone === "over" && s.nudgeChipTxtOver, n.meta.tone === "soon" && s.nudgeChipTxtSoon]}>{n.meta.label}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Press onPress={n.action} hitSlop={8} style={s.nudgeDone}><Feather name={n.icon as any} size={18} color={n.iconColor} /></Press>
-                </View>
-              </FadeInUp>
-            ))}
-          </>
-        ) : (
-          <View style={s.homeEmpty}>
-            <Orb size={64} state="idle" />
-            <Text style={s.homeEmptyTxt}>nothing needs you right now. tell me about someone you met, or a promise you made, and i'll keep watch.</Text>
           </View>
-        )}
-      </ScrollView>
-    </KeyboardAvoidingView>
-  );
-}
-
-function PeopleView({ people, promises, onRefresh, isPro, onUpgrade, onBrief, onSignOut }: { people: GraphPerson[]; promises: PromiseItem[]; onRefresh: () => Promise<void> | void; isPro: boolean; onUpgrade: () => void; onBrief: () => void; onSignOut: () => void }) {
-  const [refreshing, setRefreshing] = useState(false);
-  const doRefresh = async () => { setRefreshing(true); try { await onRefresh(); } finally { setRefreshing(false); } };
-  return (
-    <ScrollView
-      style={s.fill}
-      contentContainerStyle={s.pageScroll}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={doRefresh} tintColor={c.accent} />}
-    >
-      <ScreenHeader title="People" subtitle="Everyone you've told Aura about, and the promises between you. This is your relationship graph." />
-      {isPro ? (
-        <View style={s.proChip}><Feather name="star" size={13} color={c.accent} /><Text style={s.proChipTxt}>Aura Pro</Text></View>
-      ) : (
-        <Press style={s.upsell} onPress={onUpgrade}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.upsellTitle}>Unlock Aura Pro</Text>
-            <Text style={s.upsellSub}>your daily brief, unlimited people, and priority ai.</Text>
-          </View>
-          <View style={s.upsellCta}><Text style={s.upsellCtaTxt}>$12/mo</Text></View>
-        </Press>
-      )}
-      <Press style={s.briefBtn} onPress={onBrief}>
-        <Feather name="sun" size={17} color="#FFF" />
-        <Text style={s.briefBtnTxt}>Daily brief</Text>
-      </Press>
-      {promises.length > 0 ? (
-        <View style={{ marginBottom: sp.l }}>
-          <Text style={s.sectionLabel}>Open promises</Text>
-          {promises.map((p, i) => (
-            <FadeInUp key={i}>
-              <View style={s.promiseItem}>
-                <View style={s.promiseDot} />
-                <View style={{ flex: 1 }}>
-                  <Text style={s.promiseTxt}>{p.text}</Text>
-                  <Text style={s.promiseMeta}>
-                    {p.direction === "owed_to_me" ? "owed to you" : "you owe"}{p.person ? ` · ${p.person}` : ""}{p.due ? ` · by ${p.due}` : ""}
-                  </Text>
+          <View style={hs.secRow}><Text style={hs.sec}>who needs you</Text><Press onPress={onBrief} hitSlop={8}><Text style={hs.brief}>daily brief →</Text></Press></View>
+          {nudges.length ? nudges.map((n) => (
+            <FadeInUp key={n.key}>
+              <View style={hs.card}>
+                <Avatar name={n.person} size={54} ring={n.ring} glow={n.glow} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={hs.cardTitle} numberOfLines={1}>{n.title}</Text>
+                  <Text style={hs.cardBody} numberOfLines={1}>{n.body}</Text>
+                  {n.chip ? <Chip label={n.chip.label} bg={n.chip.bg} fg={n.chip.fg} /> : null}
                 </View>
+                <Press onPress={n.action} style={[hs.act, { backgroundColor: n.actBg }]}><Feather name={n.icon as any} size={19} color="#fff" /></Press>
               </View>
             </FadeInUp>
-          ))}
-        </View>
-      ) : null}
-      <Text style={s.sectionLabel}>Your people</Text>
-      {people.length === 0 ? (
-        <View style={s.peopleEmpty}>
-          <Feather name="users" size={26} color={c.muted} />
-          <Text style={s.peopleEmptyTxt}>Tell Aura about someone you met, like "just met alex, runs a design studio, into film", and they'll show up here.</Text>
-        </View>
-      ) : (
-        people.map((p) => (
-          <FadeInUp key={p.person}>
-            <View style={s.personCard}>
-              <View style={s.personAvatar}><Text style={s.personInitial}>{(p.person || "?").trim().charAt(0).toUpperCase()}</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.personName}>{p.person}</Text>
-                {(p.relation || p.org) ? <Text style={s.personOrg}>{[p.relation, p.org].filter(Boolean).join(" · ")}</Text> : null}
-                {p.birthday ? <View style={s.bdayRow}><Feather name="gift" size={11} color={c.muted} /><Text style={s.bdayTxt}>{fmtBday(p.birthday)}</Text></View> : null}
-                {p.topics && p.topics.filter(Boolean).length ? (
-                  <View style={s.topicRow}>
-                    {p.topics.filter(Boolean).map((t) => (
-                      <View key={t} style={s.topicChip}><Text style={s.topicChipTxt}>{t}</Text></View>
-                    ))}
-                  </View>
-                ) : null}
-                {p.open_promises && p.open_promises.filter(Boolean).length ? (
-                  <View style={s.personPromises}>
-                    {p.open_promises.filter(Boolean).map((op, j) => (
-                      <View key={j} style={s.personPromiseRow}>
-                        <Feather name="corner-down-right" size={12} color={c.accent} />
-                        <Text style={s.personPromiseTxt}>{op}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            </View>
-          </FadeInUp>
-        ))
-      )}
-      <Press style={s.signOut} onPress={onSignOut} hitSlop={8}>
-        <Feather name="log-out" size={15} color={c.muted} />
-        <Text style={s.signOutTxt}>Sign out</Text>
-      </Press>
-    </ScrollView>
+          )) : (
+            <View style={hs.empty}><Feather name="sun" size={26} color="#fff" /><Text style={hs.emptyTxt}>nothing needs you right now. tell aura about someone you met, or a promise you made.</Text></View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
+const hs = StyleSheet.create({
+  scroll: { padding: 16, paddingTop: 6, paddingBottom: 30 },
+  greet: { fontFamily: font.display, fontSize: 30, color: "#fff", letterSpacing: -0.9, lineHeight: 34 },
+  sub: { fontFamily: font.semibold, fontSize: 14, color: "rgba(255,255,255,0.92)", letterSpacing: -0.2, marginTop: 4, marginBottom: 14 },
+  statRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
+  stat: { flex: 1, backgroundColor: "rgba(255,255,255,0.94)", borderRadius: 18, borderWidth: 2.5, borderColor: "#fff", paddingVertical: 10, paddingHorizontal: 6, alignItems: "center", ...shadow.puff },
+  statN: { fontFamily: font.display, fontSize: 21, color: c.ink, letterSpacing: -0.6 },
+  statL: { fontFamily: font.semibold, fontSize: 11, color: c.muted, letterSpacing: -0.2, marginTop: 1 },
+  capture: { backgroundColor: "#fff", borderRadius: 22, padding: 12, marginBottom: 16, ...shadow.card },
+  captureInput: { fontFamily: font.medium, fontSize: 15, color: c.ink, letterSpacing: -0.2, minHeight: 40, padding: 0 },
+  captureRow: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 8, marginTop: 6 },
+  send: { width: 40, height: 40, borderRadius: 20, backgroundColor: c.accent, alignItems: "center", justifyContent: "center", borderWidth: 2.5, borderColor: "#fff", ...shadow.puff },
+  secRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8, paddingHorizontal: 2 },
+  sec: { fontFamily: font.display, fontSize: 15, color: "#fff", letterSpacing: -0.4 },
+  brief: { fontFamily: font.bold, fontSize: 13, color: "#fff", letterSpacing: -0.2, opacity: 0.95 },
+  card: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 22, padding: 11, marginBottom: 10, ...shadow.card },
+  cardTitle: { fontFamily: font.display, fontSize: 16, color: c.ink, letterSpacing: -0.4, lineHeight: 19 },
+  cardBody: { fontFamily: font.medium, fontSize: 12.5, color: c.muted, letterSpacing: -0.2, marginTop: 1 },
+  chip: { alignSelf: "flex-start", borderRadius: 999, borderWidth: 2, borderColor: "#fff", paddingHorizontal: 9, paddingVertical: 3, marginTop: 6, ...shadow.soft },
+  chipTxt: { fontFamily: font.bold, fontSize: 10.5, letterSpacing: -0.2 },
+  act: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#fff", ...shadow.puff },
+  empty: { alignItems: "center", gap: 10, paddingVertical: 30, paddingHorizontal: 24 },
+  emptyTxt: { fontFamily: font.semibold, fontSize: 14.5, color: "rgba(255,255,255,0.95)", textAlign: "center", letterSpacing: -0.2, lineHeight: 21 },
+});
+
+const SLOTS = [
+  { x: 27, y: 22 }, { x: 73, y: 24 }, { x: 15, y: 50 }, { x: 85, y: 51 },
+  { x: 31, y: 76 }, { x: 69, y: 78 }, { x: 50, y: 13 }, { x: 50, y: 88 },
+];
+function Float({ i, children }: { i: number; children: React.ReactNode }) {
+  const a = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(a, { toValue: 1, duration: 2200 + i * 170, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(a, { toValue: 0, duration: 2200 + i * 170, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start(); return () => loop.stop();
+  }, []);
+  const ty = a.interpolate({ inputRange: [0, 1], outputRange: [0, i % 2 ? 7 : -7] });
+  return <Animated.View style={{ transform: [{ translateY: ty }] }}>{children}</Animated.View>;
+}
+function PeopleView({ people, onRefresh, isPro, onUpgrade, onBrief, onSignOut }: { people: GraphPerson[]; promises: PromiseItem[]; onRefresh: () => Promise<void> | void; isPro: boolean; onUpgrade: () => void; onBrief: () => void; onSignOut: () => void }) {
+  useEffect(() => { onRefresh(); }, []);
+  const shown = people.slice(0, 8);
+  const need = people.filter((p) => { const b = daysUntilBirthday(p.birthday); return (b !== null && b <= 21) || !!(p.open_promises && p.open_promises.length); }).length;
+  const score = people.length ? Math.max(38, 98 - need * 7) : 100;
+  const cx = 50, cy = 47;
+  return (
+    <View style={s.fill}>
+      <LinearGradient colors={grad.cons as any} style={StyleSheet.absoluteFill} />
+      <View style={cs.top}>
+        <View style={{ flex: 1 }}>
+          <Text style={cs.h}>your circle</Text>
+          <Text style={cs.hSub}>{people.length} {people.length === 1 ? "person" : "people"}{need ? ` · ${need} need you` : ""}</Text>
+        </View>
+        <View style={cs.health}><Text style={cs.healthN}>{score}</Text><Text style={cs.healthL}>HEALTH</Text></View>
+      </View>
+      <View style={cs.canvas}>
+        {people.length === 0 ? (
+          <View style={cs.emptyWrap}><Orb size={72} state="idle" /><Text style={cs.emptyTxt}>your constellation is empty. tell aura about the people who matter, and they'll appear here.</Text></View>
+        ) : (
+          <>
+            <Svg style={StyleSheet.absoluteFill as any} viewBox="0 0 100 100" preserveAspectRatio="none">
+              {shown.map((_, i) => <Line key={i} x1={cx} y1={cy} x2={SLOTS[i].x} y2={SLOTS[i].y} stroke="rgba(255,255,255,0.26)" strokeWidth={0.4} />)}
+            </Svg>
+            <View style={[cs.node, { left: `${cx}%`, top: `${cy}%`, marginLeft: -46, marginTop: -34 }]}>
+              <View style={cs.youOrb}><Text style={cs.youTxt}>you</Text></View>
+            </View>
+            {shown.map((p, i) => {
+              const b = daysUntilBirthday(p.birthday); const bsoon = b !== null && b <= 21;
+              const owes = !!(p.open_promises && p.open_promises.length);
+              const ring = bsoon ? c.pink : owes ? c.coral : c.mint;
+              const size = /family|partner/i.test(p.relation || "") ? 62 : 52;
+              const st = bsoon ? `🎂 ${b === 0 ? "today" : b + "d"}` : owes ? "owes you" : (p.relation || "");
+              return (
+                <View key={p.person} style={[cs.node, { left: `${SLOTS[i].x}%`, top: `${SLOTS[i].y}%`, marginLeft: -46, marginTop: -size / 2 }]}>
+                  <Float i={i}><Avatar name={p.person} size={size} ring={ring} glow={bsoon} /></Float>
+                  <Text style={cs.nm} numberOfLines={1}>{p.person}</Text>
+                  {st ? <Text style={cs.st} numberOfLines={1}>{st}</Text> : null}
+                </View>
+              );
+            })}
+          </>
+        )}
+      </View>
+      <View style={cs.legend}>
+        <View style={cs.lg}><View style={[cs.dot, { backgroundColor: c.mint }]} /><Text style={cs.lgTxt}>in touch</Text></View>
+        <View style={cs.lg}><View style={[cs.dot, { backgroundColor: c.pink }]} /><Text style={cs.lgTxt}>birthday</Text></View>
+        <View style={cs.lg}><View style={[cs.dot, { backgroundColor: c.coral }]} /><Text style={cs.lgTxt}>owed</Text></View>
+      </View>
+      <View style={cs.actions}>
+        <Press style={cs.pillPrimary} onPress={onBrief}><Feather name="sun" size={15} color="#fff" /><Text style={cs.pillPrimaryTxt}>daily brief</Text></Press>
+        {isPro ? <View style={cs.pill}><Feather name="star" size={12} color="#fff" /><Text style={cs.pillTxt}>Aura Pro</Text></View>
+          : <Press style={cs.pill} onPress={onUpgrade}><Text style={cs.pillTxt}>✦ Pro</Text></Press>}
+        <Press style={cs.iconPill} onPress={onSignOut} hitSlop={8}><Feather name="log-out" size={15} color="#fff" /></Press>
+      </View>
+    </View>
+  );
+}
+const cs = StyleSheet.create({
+  top: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 2 },
+  h: { fontFamily: font.display, fontSize: 26, color: "#fff", letterSpacing: -0.8 },
+  hSub: { fontFamily: font.semibold, fontSize: 13, color: "rgba(255,255,255,0.9)", letterSpacing: -0.2, marginTop: 1 },
+  health: { width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.16)", borderWidth: 3, borderColor: c.mint, alignItems: "center", justifyContent: "center" },
+  healthN: { fontFamily: font.display, fontSize: 18, color: "#fff", letterSpacing: -0.5, lineHeight: 19 },
+  healthL: { fontFamily: font.bold, fontSize: 7, color: "rgba(255,255,255,0.8)", letterSpacing: 0.4 },
+  canvas: { flex: 1, position: "relative", marginHorizontal: 8 },
+  node: { position: "absolute", width: 92, alignItems: "center" },
+  youOrb: { width: 68, height: 68, borderRadius: 34, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", ...shadow.card },
+  youTxt: { fontFamily: font.display, fontSize: 15, color: c.accent, letterSpacing: -0.5 },
+  nm: { fontFamily: font.display, fontSize: 12, color: "#fff", letterSpacing: -0.3, marginTop: 4, textShadowColor: "rgba(20,10,60,0.5)", textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } },
+  st: { fontFamily: font.semibold, fontSize: 9.5, color: "rgba(255,255,255,0.9)", letterSpacing: -0.2 },
+  emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14, paddingHorizontal: 40 },
+  emptyTxt: { fontFamily: font.semibold, fontSize: 15, color: "rgba(255,255,255,0.95)", textAlign: "center", letterSpacing: -0.2, lineHeight: 22 },
+  legend: { flexDirection: "row", justifyContent: "center", gap: 7, paddingVertical: 8 },
+  lg: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.2)", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.4)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  lgTxt: { fontFamily: font.bold, fontSize: 10.5, color: "#fff", letterSpacing: -0.2 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  actions: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 20, paddingTop: 4, paddingBottom: 10 },
+  pillPrimary: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 44, borderRadius: 999, backgroundColor: c.accent, borderWidth: 2.5, borderColor: "#fff", ...shadow.puff },
+  pillPrimaryTxt: { fontFamily: font.bold, fontSize: 14, color: "#fff", letterSpacing: -0.3 },
+  pill: { flexDirection: "row", alignItems: "center", gap: 5, height: 44, paddingHorizontal: 15, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.18)", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.4)" },
+  pillTxt: { fontFamily: font.bold, fontSize: 13, color: "#fff", letterSpacing: -0.2 },
+  iconPill: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.18)", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.4)" },
+});
 
 const EmptyChat = ({ onSuggest, onDemo }: { onSuggest: (t: string) => void; onDemo: () => void }) => (
   <View style={s.empty}>
@@ -1288,10 +1326,11 @@ function AuthGate({ onAuthed }: { onAuthed: (isNew: boolean) => void }) {
 }
 
 export default function Root() {
+  const [fontsLoaded] = useFonts({ Nunito_400Regular, Nunito_500Medium, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold });
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [onboarding, setOnboarding] = useState(false);
   useEffect(() => { loadSession().then((ok) => setAuthed(ok)).catch(() => setAuthed(false)); }, []);
-  if (authed === null) return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: c.bg }}><Orb size={110} state="idle" /></View>;
+  if (!fontsLoaded || authed === null) return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: c.bg }}><Orb size={110} state="idle" /></View>;
   if (!authed) return <AuthGate onAuthed={(isNew) => { setOnboarding(isNew); setAuthed(true); }} />;
   if (onboarding) return <Onboarding onDone={() => setOnboarding(false)} />;
   return <AuraApp onSignOut={() => { setOnboarding(false); setAuthed(false); }} />;
