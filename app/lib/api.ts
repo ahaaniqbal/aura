@@ -143,6 +143,8 @@ export const getGraph = async (): Promise<{ people: GraphPerson[]; promises: Pro
   } catch (e) { return { people: [], promises: [] }; }
 };
 export const getBrief = () => post("brief", {});
+// ambient capture: a conversation transcript -> people + promises + emotional weight -> graph + warm summary
+export const capture = (text: string) => post("capture", { text });
 export const closePromise = (text: string) => post("graph", { op: "close_promise", text });
 export const registerDevice = (token: string, platform: string) => post("register_device", { token, platform });
 
