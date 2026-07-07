@@ -117,6 +117,7 @@ export const addNote = (text: string) => post("note", { text });
 export const syncEmail = () => post("sync_email", {});
 export const clearChat = () => post("reset", { keep_memories: true });
 export const setLocation = (lat: number, lng: number, place: string) => post("set_location", { lat, lng, place });
+export const setTimezone = (timezone: string) => post("set_timezone", { timezone });
 export const transcribe = async (audio_base64: string, mime = "audio/m4a"): Promise<string> => {
   try {
     const r = await authedFetch(`${API}/transcribe`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audio_base64, mime }) });

@@ -28,7 +28,7 @@ import PersonSheet from "./components/PersonSheet";
 import PulseCard from "./components/PulseCard";
 import { closeness, warmth, isDrifting, contactStats } from "./lib/weight";
 import CaptureMoment from "./components/CaptureMoment";
-import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getPulse, getSubscription, GraphPerson, loadSession, login, logout, logPulse, Memory, Message, PromiseItem, Pulse, registerDevice, setLocation, signup, simulate, subscribe, syncEmail } from "./lib/api";
+import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getPulse, getSubscription, GraphPerson, loadSession, login, logout, logPulse, Memory, Message, PromiseItem, Pulse, registerDevice, setLocation, setTimezone, signup, simulate, subscribe, syncEmail } from "./lib/api";
 
 const INPUT_LINE_H = 22;
 const INPUT_MAX_H = 120;
@@ -142,6 +142,8 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
     getConnections().then(setServerConnected).catch(() => {});
     loadGraph();
     loadPulse();
+    // report the device's timezone so briefings/nudges arrive at your local morning, not a fixed server hour
+    try { const tz = Intl.DateTimeFormat().resolvedOptions().timeZone; if (tz) setTimezone(tz).catch(() => {}); } catch (e) {}
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
