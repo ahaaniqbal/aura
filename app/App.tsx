@@ -24,6 +24,7 @@ import { c, font, grad, layout, r, shadow, sp, type as ty } from "./theme";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Line } from "react-native-svg";
 import Avatar from "./components/Avatar";
+import CaptureMoment from "./components/CaptureMoment";
 import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getSubscription, GraphPerson, loadSession, login, logout, Memory, Message, PromiseItem, registerDevice, setLocation, signup, simulate, subscribe, syncEmail } from "./lib/api";
 
 const INPUT_LINE_H = 22;
@@ -73,6 +74,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   const [payOpen, setPayOpen] = useState(false);
   const [payBusy, setPayBusy] = useState(false);
   const [payErr, setPayErr] = useState("");
+  const [recOpen, setRecOpen] = useState(false);
   const [serverConnected, setServerConnected] = useState<string[]>([]);
   const [graph, setGraph] = useState<{ people: GraphPerson[]; promises: PromiseItem[] }>({ people: [], promises: [] });
   const [pending, setPending] = useState<{ id: string; content: string }[]>([]);
@@ -302,7 +304,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
       </View>
       )}
 
-      {tab === "today" && <HomeView promises={graph.promises} people={graph.people} busy={busy} onCapture={homeCapture} onDone={donePromise} onBrief={briefFlow} />}
+      {tab === "today" && <HomeView promises={graph.promises} people={graph.people} busy={busy} onCapture={homeCapture} onDone={donePromise} onBrief={briefFlow} onRecord={() => setRecOpen(true)} />}
 
       {tab === "chat" && (
         <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
@@ -419,6 +421,8 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <CaptureMoment visible={recOpen} onClose={() => setRecOpen(false)} onCaptured={() => { refresh(); loadGraph(); }} />
     </SafeAreaView>
   );
 }
@@ -690,7 +694,7 @@ function Stat({ n, label }: { n: string; label: string }) {
 function Chip({ label, bg, fg }: { label: string; bg: string; fg: string }) {
   return <View style={[hs.chip, { backgroundColor: bg }]}><Text style={[hs.chipTxt, { color: fg }]}>{label}</Text></View>;
 }
-function HomeView({ promises, people, busy, onCapture, onDone, onBrief }: { promises: PromiseItem[]; people: GraphPerson[]; busy: boolean; onCapture: (t: string) => void; onDone: (text: string) => void; onBrief: () => void }) {
+function HomeView({ promises, people, busy, onCapture, onDone, onBrief, onRecord }: { promises: PromiseItem[]; people: GraphPerson[]; busy: boolean; onCapture: (t: string) => void; onDone: (text: string) => void; onBrief: () => void; onRecord: () => void }) {
   const [q, setQ] = useState("");
   const submit = () => { if (!q.trim()) return; onCapture(q); setQ(""); };
   const pN = promises.map((p) => {
@@ -727,6 +731,14 @@ function HomeView({ promises, people, busy, onCapture, onDone, onBrief }: { prom
               </Press>
             </View>
           </View>
+          <Press onPress={onRecord} style={hs.recPill}>
+            <View style={hs.recMic}><Feather name="mic" size={16} color="#fff" /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={hs.recTitle}>capture a moment</Text>
+              <Text style={hs.recSub}>record a conversation, i'll remember it</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color={c.muted} />
+          </Press>
           <View style={hs.secRow}><Text style={hs.sec}>who needs you</Text><Press onPress={onBrief} hitSlop={8}><Text style={hs.brief}>daily brief →</Text></Press></View>
           {nudges.length ? nudges.map((n) => (
             <FadeInUp key={n.key}>
@@ -771,6 +783,10 @@ const hs = StyleSheet.create({
   act: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#fff", ...shadow.puff },
   empty: { alignItems: "center", gap: 10, paddingVertical: 30, paddingHorizontal: 24 },
   emptyTxt: { fontFamily: font.semibold, fontSize: 14.5, color: "rgba(255,255,255,0.95)", textAlign: "center", letterSpacing: -0.2, lineHeight: 21 },
+  recPill: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#fff", borderRadius: 22, padding: 12, marginBottom: 16, ...shadow.card },
+  recMic: { width: 40, height: 40, borderRadius: 20, backgroundColor: c.pink, alignItems: "center", justifyContent: "center", borderWidth: 2.5, borderColor: "#fff", ...shadow.soft },
+  recTitle: { fontFamily: font.display, fontSize: 15.5, color: c.ink, letterSpacing: -0.4 },
+  recSub: { fontFamily: font.medium, fontSize: 12, color: c.muted, letterSpacing: -0.2, marginTop: 1 },
 });
 
 const SLOTS = [
