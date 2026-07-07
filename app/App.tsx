@@ -821,7 +821,7 @@ function PeopleView({ people, onRefresh, isPro, onUpgrade, onBrief, onSignOut }:
               const owes = !!(p.open_promises && p.open_promises.length);
               const ring = bsoon ? c.pink : owes ? c.coral : c.mint;
               const size = /family|partner/i.test(p.relation || "") ? 62 : 52;
-              const st = bsoon ? `🎂 ${b === 0 ? "today" : b + "d"}` : owes ? "owes you" : (p.relation || "");
+              const st = bsoon ? `🎂 ${b === 0 ? "today" : b + "d"}` : owes ? "you owe" : (p.relation || "");
               return (
                 <View key={p.person} style={[cs.node, { left: `${SLOTS[i].x}%`, top: `${SLOTS[i].y}%`, marginLeft: -46, marginTop: -size / 2 }]}>
                   <Float i={i}><Avatar name={p.person} size={size} ring={ring} glow={bsoon} /></Float>
@@ -1280,7 +1280,7 @@ const s = StyleSheet.create({
   payFine: { fontFamily: font.body, fontSize: ty.caption, color: c.muted, textAlign: "center", marginTop: sp.s },
 });
 
-const authInputStyle: any = { backgroundColor: c.surface, borderWidth: 1, borderColor: c.hairline, borderRadius: 14, paddingHorizontal: 16, height: 54, fontFamily: font.body, fontSize: 16, color: c.text, marginBottom: 12 };
+const authInputStyle: any = { backgroundColor: "#fff", borderRadius: 16, paddingHorizontal: 18, height: 56, fontFamily: font.semibold, fontSize: 16, color: c.ink, letterSpacing: -0.2, marginBottom: 12, ...shadow.card };
 
 function AuthGate({ onAuthed }: { onAuthed: (isNew: boolean) => void }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -1298,30 +1298,33 @@ function AuthGate({ onAuthed }: { onAuthed: (isNew: boolean) => void }) {
     if (res.ok) onAuthed(mode === "signup"); else setErr(res.error || "something went wrong.");
   };
   return (
-    <SafeAreaView style={[s.fill, { backgroundColor: c.bg }]}>
-      <StatusBar style="dark" />
-      <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 28 }}>
-          <View style={{ alignItems: "center", marginBottom: 30 }}>
-            <Orb size={92} state="idle" />
-            <Text style={{ fontFamily: font.display, fontSize: 40, color: c.text, letterSpacing: -0.8, marginTop: 16 }}>Aura</Text>
-            <Text style={{ fontFamily: font.body, fontSize: 15, lineHeight: 22, color: c.muted, textAlign: "center", marginTop: 6 }}>the personal ai that remembers what matters.</Text>
+    <View style={s.fill}>
+      <LinearGradient colors={grad.cons as any} style={StyleSheet.absoluteFill} />
+      <StatusBar style="light" />
+      <SafeAreaView style={s.fill}>
+        <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 28 }}>
+            <View style={{ alignItems: "center", marginBottom: 30 }}>
+              <Orb size={92} state="idle" />
+              <Text style={{ fontFamily: font.display, fontSize: 44, color: "#fff", letterSpacing: -1.2, marginTop: 16 }}>aura</Text>
+              <Text style={{ fontFamily: font.medium, fontSize: 15, lineHeight: 22, color: "rgba(255,255,255,0.9)", textAlign: "center", letterSpacing: -0.2, marginTop: 6 }}>the personal ai that remembers what matters.</Text>
+            </View>
+            {mode === "signup" ? (
+              <TextInput style={authInputStyle} value={name} onChangeText={setName} placeholder="your name" placeholderTextColor="#a99fd6" autoCapitalize="words" />
+            ) : null}
+            <TextInput style={authInputStyle} value={email} onChangeText={setEmail} placeholder="email" placeholderTextColor="#a99fd6" autoCapitalize="none" keyboardType="email-address" autoCorrect={false} />
+            <TextInput style={authInputStyle} value={pw} onChangeText={setPw} placeholder="password" placeholderTextColor="#a99fd6" secureTextEntry />
+            {err ? <Text style={{ color: "#FFD7DA", fontFamily: font.semibold, fontSize: 13, letterSpacing: -0.2, marginBottom: 8, marginLeft: 4 }}>{err}</Text> : null}
+            <Pressable onPress={submit} disabled={busy} style={({ pressed }) => [{ backgroundColor: "#fff", height: 56, borderRadius: 18, alignItems: "center", justifyContent: "center", marginTop: 4, borderWidth: 3, borderColor: "rgba(255,255,255,0.6)", ...shadow.puff }, pressed && { opacity: 0.92 }]}>
+              {busy ? <ActivityIndicator color={c.accent} /> : <Text style={{ fontFamily: font.bold, fontSize: 17, color: c.accent, letterSpacing: -0.3 }}>{mode === "login" ? "log in" : "create account"}</Text>}
+            </Pressable>
+            <Pressable onPress={() => { setErr(""); setMode(mode === "login" ? "signup" : "login"); }} hitSlop={10} style={{ marginTop: 20, alignItems: "center" }}>
+              <Text style={{ fontFamily: font.semibold, fontSize: 14, color: "rgba(255,255,255,0.85)", letterSpacing: -0.2 }}>{mode === "login" ? "new here? create an account" : "have an account? log in"}</Text>
+            </Pressable>
           </View>
-          {mode === "signup" ? (
-            <TextInput style={authInputStyle} value={name} onChangeText={setName} placeholder="your name" placeholderTextColor={c.muted} autoCapitalize="words" />
-          ) : null}
-          <TextInput style={authInputStyle} value={email} onChangeText={setEmail} placeholder="email" placeholderTextColor={c.muted} autoCapitalize="none" keyboardType="email-address" autoCorrect={false} />
-          <TextInput style={authInputStyle} value={pw} onChangeText={setPw} placeholder="password" placeholderTextColor={c.muted} secureTextEntry />
-          {err ? <Text style={{ color: "#C96E68", fontFamily: font.medium, fontSize: 13, marginBottom: 8, marginLeft: 4 }}>{err}</Text> : null}
-          <Pressable onPress={submit} disabled={busy} style={({ pressed }) => [{ backgroundColor: c.accent, height: 54, borderRadius: 14, alignItems: "center", justifyContent: "center", marginTop: 4 }, pressed && { opacity: 0.9 }]}>
-            {busy ? <ActivityIndicator color={c.bg} /> : <Text style={{ fontFamily: font.semibold, fontSize: 16, color: c.bg }}>{mode === "login" ? "log in" : "create account"}</Text>}
-          </Pressable>
-          <Pressable onPress={() => { setErr(""); setMode(mode === "login" ? "signup" : "login"); }} hitSlop={10} style={{ marginTop: 20, alignItems: "center" }}>
-            <Text style={{ fontFamily: font.medium, fontSize: 14, color: c.muted }}>{mode === "login" ? "new here? create an account" : "have an account? log in"}</Text>
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
