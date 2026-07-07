@@ -1,5 +1,5 @@
-import React from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Animated, Easing, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Feather } from "@expo/vector-icons";
 import Avatar from "./Avatar";
@@ -43,6 +43,14 @@ export default function PersonSheet({ person, onClose, onAct }: { person: GraphP
   const cadence = stats ? [stats.cadenceLabel, stats.lastLabel && `last ${stats.lastLabel}`].filter(Boolean).join("  ·  ") : "";
   const ring = bsoon ? c.pink : promises.length ? c.coral : drift ? c.blue : c.mint;
 
+  // the tie meter "reads you in": fills from 0 each time a new person opens
+  const grow = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!p) return;
+    grow.setValue(0);
+    Animated.timing(grow, { toValue: 1, duration: 640, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+  }, [p?.person]);
+
   const run = (t: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); onClose(); onAct(t); };
   const gift = () => run(`help me get ${first} something they'd love. they've mentioned wanting: ${wants.join(", ")}. suggest something thoughtful and offer to handle it for me.`);
   const reach = () => run(p?.care ? `help me reach out warmly to ${first}. what's going on: ${p.care}` : `help me reach out to ${first}, i'd love to reconnect.`);
@@ -66,7 +74,7 @@ export default function PersonSheet({ person, onClose, onAct }: { person: GraphP
             </View>
 
             <View style={st.tie}>
-              <View style={st.meterTrack}><View style={[st.meterFill, { width: `${Math.max(8, cl)}%`, backgroundColor: drift ? c.blue : c.accent }]} /></View>
+              <View style={st.meterTrack}><Animated.View style={[st.meterFill, { width: grow.interpolate({ inputRange: [0, 1], outputRange: ["0%", `${Math.max(8, cl)}%`] }), backgroundColor: drift ? c.blue : c.accent }]} /></View>
               <Text style={[st.tieTxt, drift && { color: c.blue }]}>{tieLabel(cl, w)}</Text>
             </View>
             {cadence ? <Text style={st.cadence}>{cadence}</Text> : null}

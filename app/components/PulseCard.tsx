@@ -1,5 +1,5 @@
-import React from "react";
-import { Pressable, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, Easing, Pressable, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Feather } from "@expo/vector-icons";
 import { c, font, shadow } from "../theme";
@@ -34,7 +34,18 @@ export default function PulseCard({ pulse, onPulse }: { pulse: Pulse | null; onP
   const reflection = pulse?.reflection || "";
   const word = stateWord(pulse?.avg7 ?? null);
 
-  const tap = (v: number, label: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); onPulse(v, label); };
+  // the week grows in, bar by bar
+  const bars = useRef([0, 1, 2, 3, 4, 5, 6].map(() => new Animated.Value(0))).current;
+  useEffect(() => {
+    if (!hasHistory) return;
+    bars.forEach((a) => a.setValue(0));
+    Animated.stagger(55, bars.map((a) => Animated.timing(a, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }))).start();
+  }, [hasHistory]);
+
+  // optimistic: flip to "checked in" the instant they tap, before the network returns
+  const [justLogged, setJustLogged] = useState(false);
+  const tap = (v: number, label: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setJustLogged(true); onPulse(v, label); };
+  const logged = todayLogged || justLogged;
 
   return (
     <View style={st.card}>
@@ -48,9 +59,11 @@ export default function PulseCard({ pulse, onPulse }: { pulse: Pulse | null; onP
           {days.map((d, i) => (
             <View key={i} style={st.col}>
               <View style={st.barWrap}>
-                {d.valence === null
-                  ? <View style={st.empty} />
-                  : <View style={[st.bar, { height: vheight(d.valence), backgroundColor: vcolor(d.valence) }]} />}
+                <Animated.View style={{ opacity: bars[i], transform: [{ translateY: bars[i].interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>
+                  {d.valence === null
+                    ? <View style={st.empty} />
+                    : <View style={[st.bar, { height: vheight(d.valence), backgroundColor: vcolor(d.valence) }]} />}
+                </Animated.View>
               </View>
               <Text style={st.day}>{d.day[0]}</Text>
             </View>
@@ -60,7 +73,7 @@ export default function PulseCard({ pulse, onPulse }: { pulse: Pulse | null; onP
 
       {reflection ? <Text style={st.reflect}>{reflection}</Text> : null}
 
-      {!todayLogged ? (
+      {!logged ? (
         <>
           <Text style={st.ask}>{hasHistory ? "how's today?" : "how are you today?"}</Text>
           <View style={st.moods}>

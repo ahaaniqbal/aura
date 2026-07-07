@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator, Alert, Animated, Dimensions, Easing, KeyboardAvoidingView, LayoutAnimation, Modal, PanResponder, Platform, Pressable,
+  ActivityIndicator, Alert, Animated, AppState, Dimensions, Easing, KeyboardAvoidingView, LayoutAnimation, Modal, PanResponder, Platform, Pressable,
   SafeAreaView, ScrollView, StyleSheet, Text, TextInput, UIManager, View,
 } from "react-native";
 
@@ -43,25 +43,25 @@ Notifications.setNotificationHandler({
 });
 
 const STARTERS = [
-  "Remember Sarah loves tulips",
-  "What's on my calendar today?",
-  "Check my inbox for anything urgent",
+  "remember sarah loves tulips",
+  "what's on my calendar today?",
+  "check my inbox for anything urgent",
 ];
 
 const TABS = [
-  { key: "today" as const, icon: "sun", label: "Today" },
-  { key: "chat" as const, icon: "message-circle", label: "Chat" },
-  { key: "people" as const, icon: "users", label: "People" },
-  { key: "notes" as const, icon: "edit-3", label: "Notes" },
-  { key: "connect" as const, icon: "link", label: "Connect" },
+  { key: "today" as const, icon: "sun", label: "today" },
+  { key: "chat" as const, icon: "message-circle", label: "chat" },
+  { key: "people" as const, icon: "users", label: "people" },
+  { key: "notes" as const, icon: "edit-3", label: "notes" },
+  { key: "connect" as const, icon: "link", label: "connect" },
 ];
 const TOOLS = [
-  { key: "gmail", slug: "gmail", brand: "gmail", label: "Gmail", icon: "mail", sub: "Drafts replies in your voice" },
-  { key: "gcal", slug: "google-calendar", brand: "googlecalendar", label: "Calendar", icon: "calendar", sub: "Knows when you're free" },
-  { key: "notion", slug: "notion", brand: "notion", label: "Notion", icon: "file-text", sub: "Your notes and docs" },
-  { key: "slack", slug: "slack", brand: "slack", label: "Slack", icon: "slack", sub: "Catches what matters" },
-  { key: "whatsapp", slug: "", brand: "whatsapp", label: "WhatsApp", icon: "message-circle", sub: "Messages and threads" },
-  { key: "bank", slug: "", brand: "", label: "Bank and cards", icon: "credit-card", sub: "Pays, with your OK" },
+  { key: "gmail", slug: "gmail", brand: "gmail", label: "gmail", icon: "mail", sub: "drafts replies in your voice" },
+  { key: "gcal", slug: "google-calendar", brand: "googlecalendar", label: "calendar", icon: "calendar", sub: "knows when you're free" },
+  { key: "notion", slug: "notion", brand: "notion", label: "notion", icon: "file-text", sub: "your notes and docs" },
+  { key: "slack", slug: "slack", brand: "slack", label: "slack", icon: "slack", sub: "catches what matters" },
+  { key: "whatsapp", slug: "", brand: "whatsapp", label: "whatsapp", icon: "message-circle", sub: "messages and threads" },
+  { key: "bank", slug: "", brand: "", label: "bank and cards", icon: "credit-card", sub: "pays, with your ok" },
 ];
 
 function AuraApp({ onSignOut }: { onSignOut: () => void }) {
@@ -83,6 +83,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   const [pulse, setPulse] = useState<Pulse | null>(null);
   const [pending, setPending] = useState<{ id: string; content: string }[]>([]);
   const [thinking, setThinking] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const seen = useRef<Set<string>>(new Set());
   const first = useRef(true);
   const sigRef = useRef("");
@@ -151,9 +152,15 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
         await setLocation(pos.coords.latitude, pos.coords.longitude, place);
       } catch (e) { /* ignore */ }
     })();
-    const id = setInterval(refresh, 2000);
-    return () => clearInterval(id);
   }, [refresh]);
+
+  // Live refresh only where it matters (chat needs fast liveness; today a gentler beat),
+  // paused on other tabs and whenever the app is backgrounded, to spare battery + backend.
+  useEffect(() => {
+    if (tab !== "chat" && tab !== "today") return;
+    const id = setInterval(() => { if (AppState.currentState === "active") refresh(); }, tab === "chat" ? 2000 : 7000);
+    return () => clearInterval(id);
+  }, [tab, refresh]);
 
   useEffect(() => { if (tab === "people") loadGraph(); }, [tab, loadGraph]);
 
@@ -173,16 +180,19 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
     const tempId = "t" + Date.now();
     ease();
     setPending((p) => [...p, { id: tempId, content: t }]);
-    setDraft(""); setBusy(true); setThinking(true);
+    setDraft(""); setBusy(true); setThinking(true); setNotice(null);
     setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 60);
     try { await agent(t); await refresh(); loadGraph(); }
+    catch (e) { setNotice("i couldn't reach the server just now. give me a moment and try again."); }
     finally { sendingRef.current = false; setPending((p) => p.filter((x) => x.id !== tempId)); setThinking(false); setBusy(false); }
   };
   const homeCapture = async (text: string) => {
     const t = text.trim(); if (!t) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setTab("chat"); setBusy(true); setThinking(true);
-    try { await agent(t, "home"); await refresh(); await loadGraph(); } finally { setThinking(false); setBusy(false); }
+    setTab("chat"); setBusy(true); setThinking(true); setNotice(null);
+    try { await agent(t, "home"); await refresh(); await loadGraph(); }
+    catch (e) { setNotice("i couldn't reach the server just now. give me a moment and try again."); }
+    finally { setThinking(false); setBusy(false); }
   };
   const donePromise = async (text: string) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -205,8 +215,10 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   };
   const syncEmailFlow = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    setDemoOpen(false); setBusy(true); setTab("chat"); setThinking(true);
-    try { await syncEmail(); await refresh(); } finally { setThinking(false); setBusy(false); }
+    setDemoOpen(false); setBusy(true); setTab("chat"); setThinking(true); setNotice(null);
+    try { await syncEmail(); await refresh(); }
+    catch (e) { setNotice("i couldn't reach your inbox just now. try again in a moment."); }
+    finally { setThinking(false); setBusy(false); }
   };
   const addNoteFlow = async (text: string) => {
     const t = text.trim(); if (!t) return;
@@ -229,9 +241,9 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
     } catch (e) { /* ignore */ }
   };
   const clearChatFlow = () => {
-    Alert.alert("Clear chat?", "This clears the conversation. Your memory stays.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Clear", style: "destructive", onPress: async () => {
+    Alert.alert("clear chat?", "this clears the conversation. your memory stays.", [
+      { text: "cancel", style: "cancel" },
+      { text: "clear", style: "destructive", onPress: async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
         setPending([]); setThinking(false);
         try { await clearChat(); } catch (e) {}
@@ -243,8 +255,10 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
 
   const briefFlow = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    setTab("chat"); setBusy(true); setThinking(true);
-    try { await getBrief(); await refresh(); } finally { setThinking(false); setBusy(false); }
+    setTab("chat"); setBusy(true); setThinking(true); setNotice(null);
+    try { await getBrief(); await refresh(); }
+    catch (e) { setNotice("i couldn't put your brief together just now. try again in a moment."); }
+    finally { setThinking(false); setBusy(false); }
   };
   const signOut = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -279,10 +293,10 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   const headerState: "idle" | "thinking" | "warm" = busy || thinking ? "thinking" : pendingUrgent ? "warm" : "idle";
   const locName = feed?.context?.location?.name;
   const status = feed?.context?.in_meeting
-    ? "In a meeting"
+    ? "in a meeting"
     : locName && locName !== "nearby"
       ? `Near ${locName}`
-      : "Watching quietly";
+      : "watching quietly";
   const hasChat = (feed?.messages?.length || 0) > 0 || pending.length > 0;
   const cardById = (id: string | null) => (id ? cards.find((x) => x.id === id) : undefined);
   const notes = (feed?.memories || []).filter((m) => m.source === "note");
@@ -295,7 +309,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
       <View style={s.header}>
         <Orb size={32} state={headerState} />
         <View style={s.headerText}>
-          <Text style={s.brand}>Aura</Text>
+          <Text style={s.brand}>aura</Text>
           <View style={s.statusRow}>
             <View style={[s.statusDot, { backgroundColor: headerState === "thinking" ? c.lavender : headerState === "warm" ? c.peach : c.mint }]} />
             <Text style={s.status}>{status}</Text>
@@ -309,7 +323,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
           ) : null}
           <Press onPress={() => setDemoOpen(true)} style={s.demoBtn} hitSlop={8}>
             <Feather name="play-circle" size={16} color={c.accent} />
-            <Text style={s.demoBtnTxt}>Demo</Text>
+            <Text style={s.demoBtnTxt}>demo</Text>
           </Press>
         </View>
       </View>
@@ -337,6 +351,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
               </View>
             ))}
             {thinking ? <ThinkingBubble /> : null}
+            {notice ? <Bubble m={{ id: "notice", role: "aura", content: notice, kind: "system", card_id: null, created_at: "" } as Message} /> : null}
           </ScrollView>
           <View style={s.composer}>
             <View style={[s.inputShell, inputH > INPUT_LINE_H && s.inputShellTall]}>
@@ -344,7 +359,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
                 style={[s.input, { height: Math.max(INPUT_LINE_H, inputH) }]}
                 value={draft}
                 onChangeText={setDraft}
-                placeholder="Message Aura…"
+                placeholder="message aura…"
                 placeholderTextColor={c.muted}
                 multiline
                 scrollEnabled={inputH >= INPUT_MAX_H}
@@ -373,7 +388,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
         </KeyboardAvoidingView>
       )}
 
-      {tab === "people" && <PeopleView people={graph.people} promises={graph.promises} onRefresh={loadGraph} onAct={homeCapture} isPro={isPro} onUpgrade={() => setPayOpen(true)} onBrief={briefFlow} onSignOut={signOut} />}
+      {tab === "people" && <PeopleView people={graph.people} promises={graph.promises} onRefresh={loadGraph} onAct={homeCapture} onAdd={() => setTab("today")} isPro={isPro} onUpgrade={() => setPayOpen(true)} onBrief={briefFlow} onSignOut={signOut} />}
       {tab === "notes" && <NotesView notes={notes} onAdd={addNoteFlow} busy={busy} />}
       {tab === "connect" && <ConnectView serverConnected={serverConnected} onConnect={connectFlow} />}
 
@@ -398,13 +413,13 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
         <Pressable style={s.modalBg} onPress={() => setDemoOpen(false)}>
           <Pressable style={s.sheet} onPress={() => {}}>
             <View style={s.sheetGrabber} />
-            <Text style={s.sheetTitle}>Try Aura</Text>
-            <Text style={s.sheetSub}>Run a live action or simulate a scenario</Text>
-            <DemoBtn icon="inbox" label="Check my inbox" sub="Live" onPress={syncEmailFlow} />
-            <DemoBtn icon="map-pin" label="Walk past the bakery" onPress={() => runSim("near_bakery")} />
-            <DemoBtn icon="mail" label="Email while in a meeting" onPress={() => runSim("incoming_email")} />
-            <DemoBtn icon="zap" label="Urgent email arrives" onPress={() => runSim("incoming_email", { urgent: true })} />
-            <DemoBtn icon="check-circle" label="Meeting ends" onPress={() => runSim("meeting_end")} />
+            <Text style={s.sheetTitle}>try aura</Text>
+            <Text style={s.sheetSub}>run a live action, or simulate a scenario</Text>
+            <DemoBtn icon="inbox" label="check my inbox" sub="live" onPress={syncEmailFlow} />
+            <DemoBtn icon="map-pin" label="walk past the bakery" onPress={() => runSim("near_bakery")} />
+            <DemoBtn icon="mail" label="email while in a meeting" onPress={() => runSim("incoming_email")} />
+            <DemoBtn icon="zap" label="urgent email arrives" onPress={() => runSim("incoming_email", { urgent: true })} />
+            <DemoBtn icon="check-circle" label="meeting ends" onPress={() => runSim("meeting_end")} />
           </Pressable>
         </Pressable>
       </Modal>
@@ -415,7 +430,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
             <View style={s.sheetGrabber} />
             <View style={s.payHeader}>
               <Orb size={38} state="warm" />
-              <Text style={s.payTitle}>Aura Pro</Text>
+              <Text style={s.payTitle}>aura pro</Text>
             </View>
             <Text style={s.payPrice}>$12<Text style={s.payPriceUnit}> / month</Text></Text>
             {["unlimited people and promises", "your proactive daily brief", "priority ai model", "early access to new powers"].map((f) => (
@@ -563,27 +578,27 @@ function InlineCard({ card, onAct, busy }: { card: Card; onAct: (c: Card, d: "ap
   const nopeOp = pan.interpolate({ inputRange: [-96, -14], outputRange: [1, 0], extrapolate: "clamp" });
   return (
     <Animated.View style={[s.card, urgent && s.cardUrgent, { transform: [{ translateX: pan }, { rotate }] }]} {...responder.panHandlers}>
-      <Animated.View pointerEvents="none" style={[s.stamp, s.stampApprove, { opacity: approveOp }]}><Text style={s.stampApproveTxt}>Approve</Text></Animated.View>
-      <Animated.View pointerEvents="none" style={[s.stamp, s.stampNope, { opacity: nopeOp }]}><Text style={s.stampNopeTxt}>Not now</Text></Animated.View>
+      <Animated.View pointerEvents="none" style={[s.stamp, s.stampApprove, { opacity: approveOp }]}><Text style={s.stampApproveTxt}>approve</Text></Animated.View>
+      <Animated.View pointerEvents="none" style={[s.stamp, s.stampNope, { opacity: nopeOp }]}><Text style={s.stampNopeTxt}>not now</Text></Animated.View>
       {(card.memory_refs?.length || urgent) ? (
         <View style={s.chipRow}>
-          {urgent ? <View style={s.tag}><Text style={s.tagTxt}>Urgent</Text></View> : null}
+          {urgent ? <View style={s.tag}><Text style={s.tagTxt}>urgent</Text></View> : null}
           {(card.memory_refs || []).slice(0, 1).map((mr, i) => {
             const short = String(mr).split("\n")[0].replace(/^extra context:\s*/i, "").trim();
-            return <View key={i} style={s.chip}><Text style={s.chipTxt} numberOfLines={1}>From memory · {short.length > 32 ? short.slice(0, 32) + "…" : short}</Text></View>;
+            return <View key={i} style={s.chip}><Text style={s.chipTxt} numberOfLines={1}>from memory · {short.length > 32 ? short.slice(0, 32) + "…" : short}</Text></View>;
           })}
         </View>
       ) : null}
       <Text style={s.cardTitle}>{card.title}</Text>
       <Text style={s.cardBody}>{card.body}</Text>
-      <Text style={s.swipeHint}>Swipe right to approve · left to dismiss</Text>
+      <Text style={s.swipeHint}>swipe right to approve · left to dismiss</Text>
       <View style={s.btnRow}>
         <Press style={s.approve} onPress={() => finish("approve", 1)} disabled={busy}>
           <Feather name="check" size={18} color="#FFF" style={{ marginRight: 6 }} />
-          <Text style={s.approveTxt}>Approve</Text>
+          <Text style={s.approveTxt}>approve</Text>
         </Press>
         <Press style={s.decline} onPress={() => finish("decline", -1)} disabled={busy}>
-          <Text style={s.declineTxt}>Not now</Text>
+          <Text style={s.declineTxt}>not now</Text>
         </Press>
       </View>
     </Animated.View>
@@ -596,19 +611,19 @@ function NotesView({ notes, onAdd, busy }: { notes: Memory[]; onAdd: (t: string)
   return (
     <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
       <ScrollView style={s.fill} contentContainerStyle={s.pageScroll} keyboardShouldPersistTaps="handled">
-        <ScreenHeader title="Notes" subtitle="Anything you save becomes memory Aura can recall later." />
+        <ScreenHeader title="notes" subtitle="anything you save becomes memory aura can recall later." />
         <View style={s.notePage}>
           <TextInput
             style={s.notePageInput}
             value={d}
             onChangeText={setD}
-            placeholder="Write a note…"
+            placeholder="write a note…"
             placeholderTextColor={c.muted}
             multiline
             textAlignVertical="top"
           />
           <View style={s.notePageFooter}>
-            <Text style={s.noteHint}>{d.trim() ? "Tap Save to add to memory" : "Type or tap the mic"}</Text>
+            <Text style={s.noteHint}>{d.trim() ? "tap save to add to memory" : "type or tap the mic"}</Text>
             <View style={s.noteActions}>
               <MicButton onResult={(t) => setD((p) => (p ? p + " " + t : t))} disabled={busy} size={layout.controlSm} />
               <Press onPress={submit} disabled={!d.trim()} style={[s.saveBtn, !d.trim() && s.sendBtnOff]}>
@@ -617,7 +632,7 @@ function NotesView({ notes, onAdd, busy }: { notes: Memory[]; onAdd: (t: string)
             </View>
           </View>
         </View>
-        {notes.length > 0 ? <Text style={s.sectionLabel}>Saved notes</Text> : null}
+        {notes.length > 0 ? <Text style={s.sectionLabel}>saved notes</Text> : null}
         {notes.map((n) => (
           <FadeInUp key={n.id}>
             <View style={s.noteItem}>
@@ -634,7 +649,7 @@ function ConnectView({ serverConnected, onConnect }: { serverConnected: string[]
   const connected = TOOLS.filter((t) => t.slug && serverConnected.includes(t.slug)).length;
   return (
     <ScrollView style={s.fill} contentContainerStyle={s.pageScroll} keyboardShouldPersistTaps="handled">
-      <ScreenHeader title="Connect" subtitle="Link your apps so Aura can read context and act on your behalf." />
+      <ScreenHeader title="connect" subtitle="link your apps so aura can read context and act on your behalf." />
       <View style={s.connectSummary}>
         <Text style={s.connectSummaryTxt}>{connected} of {TOOLS.filter((t) => t.slug).length} connected</Text>
       </View>
@@ -651,7 +666,7 @@ function ConnectView({ serverConnected, onConnect }: { serverConnected: string[]
             <View style={[s.connectPill, on ? s.connectPillOn : !connectable ? s.connectPillSoon : null]}>
               {on ? <Feather name="check" size={14} color={c.success} style={{ marginRight: 4 }} /> : null}
               <Text style={[s.connectPillTxt, on ? s.connectPillTxtOn : !connectable ? s.connectPillTxtMuted : s.connectPillTxtAction]}>
-                {on ? "Connected" : connectable ? "Connect" : "Soon"}
+                {on ? "connected" : connectable ? "connect" : "soon"}
               </Text>
             </View>
           </Press>
@@ -839,7 +854,7 @@ function Float({ i, children }: { i: number; children: React.ReactNode }) {
   const ty = a.interpolate({ inputRange: [0, 1], outputRange: [0, i % 2 ? 7 : -7] });
   return <Animated.View style={{ transform: [{ translateY: ty }] }}>{children}</Animated.View>;
 }
-function PeopleView({ people, onRefresh, onAct, isPro, onUpgrade, onBrief, onSignOut }: { people: GraphPerson[]; promises: PromiseItem[]; onRefresh: () => Promise<void> | void; onAct: (t: string) => void; isPro: boolean; onUpgrade: () => void; onBrief: () => void; onSignOut: () => void }) {
+function PeopleView({ people, onRefresh, onAct, onAdd, isPro, onUpgrade, onBrief, onSignOut }: { people: GraphPerson[]; promises: PromiseItem[]; onRefresh: () => Promise<void> | void; onAct: (t: string) => void; onAdd: () => void; isPro: boolean; onUpgrade: () => void; onBrief: () => void; onSignOut: () => void }) {
   useEffect(() => { onRefresh(); }, []);
   const [sel, setSel] = useState<GraphPerson | null>(null);
   const shown = [...people].sort((a, b) => closeness(b) - closeness(a)).slice(0, 8);
@@ -854,11 +869,15 @@ function PeopleView({ people, onRefresh, onAct, isPro, onUpgrade, onBrief, onSig
           <Text style={cs.h}>your circle</Text>
           <Text style={cs.hSub}>{people.length} {people.length === 1 ? "person" : "people"}{need ? ` · ${need} need you` : ""}</Text>
         </View>
-        <View style={cs.health}><Text style={cs.healthN}>{score}</Text><Text style={cs.healthL}>HEALTH</Text></View>
+        <View style={cs.health}><Text style={cs.healthN}>{score}</Text><Text style={cs.healthL}>health</Text></View>
       </View>
       <View style={cs.canvas}>
         {people.length === 0 ? (
-          <View style={cs.emptyWrap}><Orb size={72} state="idle" /><Text style={cs.emptyTxt}>your constellation is empty. tell aura about the people who matter, and they'll appear here.</Text></View>
+          <View style={cs.emptyWrap}>
+            <Orb size={72} state="idle" />
+            <Text style={cs.emptyTxt}>your constellation is empty. tell aura about the people who matter, and they'll appear here.</Text>
+            <Press onPress={onAdd} style={cs.emptyCta}><Text style={cs.emptyCtaTxt}>tell aura about your people</Text><Feather name="arrow-right" size={16} color={c.accent} /></Press>
+          </View>
         ) : (
           <>
             <Svg style={StyleSheet.absoluteFill as any} viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -898,8 +917,8 @@ function PeopleView({ people, onRefresh, onAct, isPro, onUpgrade, onBrief, onSig
       </View>
       <View style={cs.actions}>
         <Press style={cs.pillPrimary} onPress={onBrief}><Feather name="sun" size={15} color="#fff" /><Text style={cs.pillPrimaryTxt}>daily brief</Text></Press>
-        {isPro ? <View style={cs.pill}><Feather name="star" size={12} color="#fff" /><Text style={cs.pillTxt}>Aura Pro</Text></View>
-          : <Press style={cs.pill} onPress={onUpgrade}><Text style={cs.pillTxt}>✦ Pro</Text></Press>}
+        {isPro ? <View style={cs.pill}><Feather name="star" size={12} color="#fff" /><Text style={cs.pillTxt}>aura pro</Text></View>
+          : <Press style={cs.pill} onPress={onUpgrade}><Text style={cs.pillTxt}>✦ pro</Text></Press>}
         <Press style={cs.iconPill} onPress={onSignOut} hitSlop={8}><Feather name="log-out" size={15} color="#fff" /></Press>
       </View>
       <PersonSheet person={sel} onClose={() => setSel(null)} onAct={onAct} />
@@ -921,6 +940,8 @@ const cs = StyleSheet.create({
   st: { fontFamily: font.semibold, fontSize: 9.5, color: "rgba(255,255,255,0.9)", letterSpacing: -0.2 },
   emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14, paddingHorizontal: 40 },
   emptyTxt: { fontFamily: font.semibold, fontSize: 15, color: "rgba(255,255,255,0.95)", textAlign: "center", letterSpacing: -0.2, lineHeight: 22 },
+  emptyCta: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#fff", height: 50, paddingHorizontal: 22, borderRadius: 999, borderWidth: 2.5, borderColor: "rgba(255,255,255,0.6)", marginTop: 4, ...shadow.puff },
+  emptyCtaTxt: { fontFamily: font.bold, fontSize: 15, color: c.accent, letterSpacing: -0.3 },
   legend: { flexDirection: "row", justifyContent: "center", gap: 7, paddingVertical: 8 },
   lg: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.2)", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.4)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   lgTxt: { fontFamily: font.bold, fontSize: 10.5, color: "#fff", letterSpacing: -0.2 },
@@ -935,8 +956,8 @@ const cs = StyleSheet.create({
 
 const EmptyChat = ({ onSuggest, onDemo }: { onSuggest: (t: string) => void; onDemo: () => void }) => (
   <View style={s.empty}>
-    <Text style={s.emptyTitle}>What should I remember?</Text>
-    <Text style={s.emptySub}>Tell me a thought, plan, or person — I'll bring it back when it matters.</Text>
+    <Text style={s.emptyTitle}>what should i remember?</Text>
+    <Text style={s.emptySub}>tell me a thought, a plan, a person. i'll bring it back when it matters.</Text>
     <View style={s.starterList}>
       {STARTERS.map((t) => (
         <Press key={t} style={s.starter} onPress={() => onSuggest(t)}>

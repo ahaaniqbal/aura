@@ -29,7 +29,7 @@ export default function CaptureMoment({ visible, onClose, onCaptured }: { visibl
   const start = async () => {
     try {
       const perm = await AudioModule.requestRecordingPermissionsAsync();
-      if (!perm.granted) return;
+      if (!perm.granted) { setPhase("err"); return; }
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
