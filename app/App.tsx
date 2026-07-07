@@ -353,7 +353,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
       </View>
       )}
 
-      {tab === "today" && <HomeView promises={graph.promises} people={graph.people} pulse={pulse} onPulse={onPulse} busy={busy} onCapture={homeCapture} onDone={donePromise} onBrief={briefFlow} onRecord={() => setRecOpen(true)} />}
+      {tab === "today" && <HomeView promises={graph.promises} people={graph.people} pulse={pulse} onPulse={onPulse} cards={feed?.cards || []} onAct={act} onEdit={() => setTab("chat")} agenda={[]} busy={busy} onCapture={homeCapture} onDone={donePromise} onBrief={briefFlow} onRecord={() => setRecOpen(true)} />}
 
       {tab === "chat" && (
         <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
@@ -604,7 +604,7 @@ function InlineCard({ card, onAct, busy }: { card: Card; onAct: (c: Card, d: "ap
       <View style={s.card}>
         <Text style={s.cardTitle}>{card.title}</Text>
         <Text style={s.cardBody}>{card.body}</Text>
-        <View style={s.doneRow}><Feather name="check" size={15} color={c.success} /><Text style={s.doneTxt}>Done</Text></View>
+        <View style={s.doneRow}><Feather name="check" size={15} color={c.success} /><Text style={s.doneTxt}>done</Text></View>
       </View>
     );
   }
@@ -756,7 +756,7 @@ function Stat({ n, label }: { n: string; label: string }) {
 function Chip({ label, bg, fg }: { label: string; bg: string; fg: string }) {
   return <View style={[hs.chip, { backgroundColor: bg }]}><Text style={[hs.chipTxt, { color: fg }]}>{label}</Text></View>;
 }
-function HomeView({ promises, people, pulse, onPulse, busy, onCapture, onDone, onBrief, onRecord }: { promises: PromiseItem[]; people: GraphPerson[]; pulse: Pulse | null; onPulse: (v: number, mood: string) => void; busy: boolean; onCapture: (t: string) => void; onDone: (text: string) => void; onBrief: () => void; onRecord: () => void }) {
+function HomeView({ promises, people, pulse, onPulse, cards, onAct, onEdit, agenda, busy, onCapture, onDone, onBrief, onRecord }: { promises: PromiseItem[]; people: GraphPerson[]; pulse: Pulse | null; onPulse: (v: number, mood: string) => void; cards: Card[]; onAct: (c: Card, d: "approve" | "decline") => void; onEdit: (c: Card) => void; agenda: { time: string; title: string }[]; busy: boolean; onCapture: (t: string) => void; onDone: (text: string) => void; onBrief: () => void; onRecord: () => void }) {
   const [q, setQ] = useState("");
   const submit = () => { if (!q.trim()) return; onCapture(q); setQ(""); };
   const pN = promises.map((p) => {
@@ -794,6 +794,8 @@ function HomeView({ promises, people, pulse, onPulse, busy, onCapture, onDone, o
         action: () => onCapture(`help me reconnect with ${p.person}, it's been a while. draft a warm, low pressure message to pick things back up.`) };
     });
   const nudges = [...cN, ...rN, ...pN, ...bN].sort((a, b) => a.rank - b.rank).slice(0, 6);
+  // work + personal, one surface: outbound drafts and urgent items you can approve at a glance
+  const approvals = cards.filter((cd) => (cd.type === "draft_held" || cd.type === "urgent") && cd.status === "pending");
   return (
     <View style={s.fill}>
       <LinearGradient colors={grad.today as any} locations={[0, 0.34, 0.64]} style={StyleSheet.absoluteFill} />
@@ -823,6 +825,15 @@ function HomeView({ promises, people, pulse, onPulse, busy, onCapture, onDone, o
             </View>
             <Feather name="chevron-right" size={20} color={c.muted} />
           </Press>
+          {approvals.length ? (
+            <>
+              <Text style={[hs.sec, { marginBottom: 8 }]}>waiting for you</Text>
+              {approvals.map((cd) => (
+                <FadeInUp key={cd.id}><ApprovalCard card={cd} onAct={onAct} onEdit={() => onEdit(cd)} /></FadeInUp>
+              ))}
+            </>
+          ) : null}
+          {agenda.length ? <AgendaStrip items={agenda} /> : null}
           <PulseCard pulse={pulse} onPulse={onPulse} />
           <View style={hs.secRow}><Text style={hs.sec}>who needs you</Text><Press onPress={onBrief} hitSlop={8}><Text style={hs.brief}>daily brief →</Text></Press></View>
           {nudges.length ? nudges.map((n) => (
@@ -842,6 +853,38 @@ function HomeView({ promises, people, pulse, onPulse, busy, onCapture, onDone, o
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+    </View>
+  );
+}
+function ApprovalCard({ card, onAct, onEdit }: { card: Card; onAct: (c: Card, d: "approve" | "decline") => void; onEdit: () => void }) {
+  const urgent = card.type === "urgent";
+  return (
+    <View style={hs.approve}>
+      <View style={hs.approveTop}>
+        <View style={[hs.approveIcon, { backgroundColor: urgent ? c.coral : c.blue }]}><Feather name={urgent ? "alert-circle" : "mail"} size={15} color="#fff" /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={hs.cardTitle} numberOfLines={1}>{card.title}</Text>
+          {card.body ? <Text style={hs.cardBody} numberOfLines={2}>{card.body}</Text> : null}
+        </View>
+      </View>
+      <View style={hs.approveRow}>
+        <Press style={hs.approveBtn} onPress={() => onAct(card, "approve")}><Feather name="check" size={15} color="#fff" /><Text style={hs.approveBtnTxt}>approve</Text></Press>
+        <Press style={hs.editBtn} onPress={onEdit}><Feather name="edit-2" size={13} color={c.accent} /><Text style={hs.editBtnTxt}>edit</Text></Press>
+        <Press style={hs.declineBtn} onPress={() => onAct(card, "decline")} hitSlop={6}><Feather name="x" size={16} color={c.muted} /></Press>
+      </View>
+    </View>
+  );
+}
+function AgendaStrip({ items }: { items: { time: string; title: string }[] }) {
+  return (
+    <View style={hs.agenda}>
+      <View style={hs.agendaHead}><Feather name="calendar" size={13} color={c.accent} /><Text style={hs.agendaLabel}>your day</Text></View>
+      {items.map((e, i) => (
+        <View key={i} style={[hs.agendaRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(23,19,52,0.08)" }]}>
+          <Text style={hs.agendaTime}>{e.time}</Text>
+          <Text style={hs.agendaTitle} numberOfLines={1}>{e.title}</Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -872,6 +915,21 @@ const hs = StyleSheet.create({
   recMic: { width: 40, height: 40, borderRadius: 20, backgroundColor: c.pink, alignItems: "center", justifyContent: "center", borderWidth: 2.5, borderColor: "#fff", ...shadow.soft },
   recTitle: { fontFamily: font.display, fontSize: 15.5, color: c.ink, letterSpacing: -0.4 },
   recSub: { fontFamily: font.medium, fontSize: 12, color: c.muted, letterSpacing: -0.2, marginTop: 1 },
+  approve: { backgroundColor: "#fff", borderRadius: 20, padding: 13, marginBottom: 10, ...shadow.card },
+  approveTop: { flexDirection: "row", alignItems: "flex-start", gap: 11 },
+  approveIcon: { width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#fff", ...shadow.soft },
+  approveRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 },
+  approveBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 40, borderRadius: 13, backgroundColor: c.mint, borderWidth: 2, borderColor: "#fff", ...shadow.soft },
+  approveBtnTxt: { fontFamily: font.bold, fontSize: 14, color: "#fff", letterSpacing: -0.3 },
+  editBtn: { flexDirection: "row", alignItems: "center", gap: 5, height: 40, paddingHorizontal: 14, borderRadius: 13, backgroundColor: "rgba(123,92,255,0.1)" },
+  editBtnTxt: { fontFamily: font.bold, fontSize: 13.5, color: c.accent, letterSpacing: -0.2 },
+  declineBtn: { width: 40, height: 40, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(23,19,52,0.05)" },
+  agenda: { backgroundColor: "#fff", borderRadius: 20, padding: 14, marginBottom: 16, ...shadow.card },
+  agendaHead: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+  agendaLabel: { fontFamily: font.display, fontSize: 14, color: c.ink, letterSpacing: -0.3 },
+  agendaRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 },
+  agendaTime: { fontFamily: font.bold, fontSize: 13, color: c.accent, letterSpacing: -0.2, width: 62 },
+  agendaTitle: { fontFamily: font.medium, fontSize: 14.5, color: c.ink, letterSpacing: -0.2, flex: 1 },
 });
 
 const SLOTS = [
