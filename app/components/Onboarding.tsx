@@ -20,6 +20,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   const [seed, setSeed] = useState("");
   const [busy, setBusy] = useState(false);
   const [people, setPeople] = useState<string[]>([]);
+  const [failed, setFailed] = useState(false);
   const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -33,9 +34,9 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
     const t = seed.trim();
     if (!t) { go(4); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    setBusy(true); setStep(3);
+    setBusy(true); setStep(3); setFailed(false);
     try { await agent(t, "onboarding"); const g = await getGraph(); setPeople((g.people || []).map((p) => p.person).filter(Boolean)); }
-    catch (e) {} finally { setBusy(false); setStep(4); }
+    catch (e) { setFailed(true); } finally { setBusy(false); setStep(4); }
   };
   const finish = () => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); onDone(); };
 
@@ -91,14 +92,14 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
             {step === 4 && (
               <ScrollView contentContainerStyle={st.scrollC} keyboardShouldPersistTaps="handled">
                 <Orb size={88} state="warm" />
-                <Text style={st.hero}>{people.length ? "here's your circle." : "you're all set."}</Text>
+                <Text style={st.hero}>{people.length ? "here's your circle." : failed ? "we'll pick this up inside." : "you're all set."}</Text>
                 {people.length ? (
                   <>
                     <View style={st.chips}>{people.slice(0, 12).map((p) => (<View key={p} style={st.chip}><Text style={st.chipTxt}>{p}</Text></View>))}</View>
                     <Text style={st.lede}>i'm keeping track of {people.length === 1 ? "them" : "them all"}. i'll nudge you before birthdays, and when you owe someone. that's the whole idea.</Text>
                   </>
                 ) : (
-                  <Text style={st.lede}>tell me about the people in your life anytime, just talk to me. i'll remember, and quietly help you show up for them.</Text>
+                  <Text style={st.lede}>{failed ? "i had a little trouble saving that just now. no worries, tell me about your people anytime, just talk to me and i'll remember." : "tell me about the people in your life anytime, just talk to me. i'll remember, and quietly help you show up for them."}</Text>
                 )}
                 <Cta label="enter aura" onPress={finish} />
               </ScrollView>
