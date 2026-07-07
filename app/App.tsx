@@ -25,9 +25,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Line } from "react-native-svg";
 import Avatar from "./components/Avatar";
 import PersonSheet from "./components/PersonSheet";
+import PulseCard from "./components/PulseCard";
 import { closeness, warmth, isDrifting, contactStats } from "./lib/weight";
 import CaptureMoment from "./components/CaptureMoment";
-import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getSubscription, GraphPerson, loadSession, login, logout, Memory, Message, PromiseItem, registerDevice, setLocation, signup, simulate, subscribe, syncEmail } from "./lib/api";
+import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getPulse, getSubscription, GraphPerson, loadSession, login, logout, logPulse, Memory, Message, PromiseItem, Pulse, registerDevice, setLocation, signup, simulate, subscribe, syncEmail } from "./lib/api";
 
 const INPUT_LINE_H = 22;
 const INPUT_MAX_H = 120;
@@ -79,6 +80,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   const [recOpen, setRecOpen] = useState(false);
   const [serverConnected, setServerConnected] = useState<string[]>([]);
   const [graph, setGraph] = useState<{ people: GraphPerson[]; promises: PromiseItem[] }>({ people: [], promises: [] });
+  const [pulse, setPulse] = useState<Pulse | null>(null);
   const [pending, setPending] = useState<{ id: string; content: string }[]>([]);
   const [thinking, setThinking] = useState(false);
   const seen = useRef<Set<string>>(new Set());
@@ -118,6 +120,12 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   const loadGraph = useCallback(async () => {
     try { setGraph(await getGraph()); } catch (e) {}
   }, []);
+  const loadPulse = useCallback(async () => {
+    try { setPulse(await getPulse()); } catch (e) {}
+  }, []);
+  const onPulse = useCallback(async (v: number, mood: string) => {
+    try { await logPulse(v, mood); await loadPulse(); } catch (e) {}
+  }, [loadPulse]);
 
   useEffect(() => {
     (async () => {
@@ -132,6 +140,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
     refresh();
     getConnections().then(setServerConnected).catch(() => {});
     loadGraph();
+    loadPulse();
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -306,7 +315,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
       </View>
       )}
 
-      {tab === "today" && <HomeView promises={graph.promises} people={graph.people} busy={busy} onCapture={homeCapture} onDone={donePromise} onBrief={briefFlow} onRecord={() => setRecOpen(true)} />}
+      {tab === "today" && <HomeView promises={graph.promises} people={graph.people} pulse={pulse} onPulse={onPulse} busy={busy} onCapture={homeCapture} onDone={donePromise} onBrief={briefFlow} onRecord={() => setRecOpen(true)} />}
 
       {tab === "chat" && (
         <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
@@ -696,7 +705,7 @@ function Stat({ n, label }: { n: string; label: string }) {
 function Chip({ label, bg, fg }: { label: string; bg: string; fg: string }) {
   return <View style={[hs.chip, { backgroundColor: bg }]}><Text style={[hs.chipTxt, { color: fg }]}>{label}</Text></View>;
 }
-function HomeView({ promises, people, busy, onCapture, onDone, onBrief, onRecord }: { promises: PromiseItem[]; people: GraphPerson[]; busy: boolean; onCapture: (t: string) => void; onDone: (text: string) => void; onBrief: () => void; onRecord: () => void }) {
+function HomeView({ promises, people, pulse, onPulse, busy, onCapture, onDone, onBrief, onRecord }: { promises: PromiseItem[]; people: GraphPerson[]; pulse: Pulse | null; onPulse: (v: number, mood: string) => void; busy: boolean; onCapture: (t: string) => void; onDone: (text: string) => void; onBrief: () => void; onRecord: () => void }) {
   const [q, setQ] = useState("");
   const submit = () => { if (!q.trim()) return; onCapture(q); setQ(""); };
   const pN = promises.map((p) => {
@@ -763,6 +772,7 @@ function HomeView({ promises, people, busy, onCapture, onDone, onBrief, onRecord
             </View>
             <Feather name="chevron-right" size={20} color={c.muted} />
           </Press>
+          <PulseCard pulse={pulse} onPulse={onPulse} />
           <View style={hs.secRow}><Text style={hs.sec}>who needs you</Text><Press onPress={onBrief} hitSlop={8}><Text style={hs.brief}>daily brief →</Text></Press></View>
           {nudges.length ? nudges.map((n) => (
             <FadeInUp key={n.key}>

@@ -52,7 +52,13 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
       } catch (e) { return { error: String(e) }; }
     };
 
+    const NOW = new Date();
+    const DOW = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    const todayStr = NOW.toISOString().slice(0, 10);
+    const dowStr = DOW[NOW.getUTCDay()];
+
     const prompt = `here is a moment from the user's life. extract what matters for their relationship memory.
+for reference, today is ${dowStr}, ${todayStr}. resolve any relative date (today, tomorrow, this saturday, next week) into an absolute YYYY-MM-DD using that; never guess a date you cannot ground.
 """
 ${text.slice(0, 4500)}
 """
@@ -61,11 +67,13 @@ return STRICT json only, all lowercase, no em dashes:
  "people":[{"name":str,"relation":"family"|"friend"|"client"|"collaborator"|"partner"|null,"note":str,"birthday":"MM-DD or null","wants":[str]}],
  "promises":[{"text":str,"person":str_or_null,"direction":"i_owe"|"owed_to_me"|null,"due":"YYYY-MM-DD, a weekday, or null"}],
  "care":[{"person":str,"note":str}],
+ "self":{"valence":int,"mood":str,"note":str},
  "summary":str
 }
 notes:
 - "wants" is gift and preference memory: anything a person mentioned wanting, wishing for, loving, saving up for, or needing, a concrete thing you could later help get them. only include real, specific wants, else an empty array.
-- "care" is the emotional weight: someone stressed, sick, grieving, moving, celebrating, anything the user should hold gently.
+- "care" is the emotional weight for other people: someone stressed, sick, grieving, moving, celebrating, anything the user should hold gently.
+- "self" is the USER'S OWN state, only if they clearly express how THEY are doing (not someone else). valence is -2 rough, -1 low, 0 ok, 1 good, 2 great; use null for valence if their own mood is not evident.
 - "summary" is one warm paragraph to the user: what you caught, and what matters, in aura's voice.
 - if nothing relevant, use empty arrays and a short honest summary.`;
 
@@ -87,6 +95,15 @@ notes:
     const promises = Array.isArray(parsed.promises) ? parsed.promises : [];
 
     const g = await graphOp("ingest", { people, promises });
+    // if the user revealed their own state, record a pulse point (emotional pulse of the user)
+    const self = parsed.self;
+    if (self && self.valence !== null && self.valence !== undefined && Number.isFinite(Number(self.valence))) {
+      try {
+        const v = Math.max(-2, Math.min(2, Math.round(Number(self.valence))));
+        await ctx.db.query("INSERT INTO pulse (user_id, valence, mood, note, source) VALUES ($1,$2,$3,$4,'capture')",
+          [userId, v, (self.mood || "").toString().slice(0, 40) || null, (self.note || "").toString().slice(0, 400) || null]);
+      } catch (e) { console.warn("pulse insert:", String(e)); }
+    }
     const summary = (parsed.summary || "").toString().trim() || "got it, i've updated your memory.";
     const m = await ctx.db.query("INSERT INTO messages (user_id, role, content, kind) VALUES ($1,'aura',$2,'capture') RETURNING *", [userId, summary]);
 

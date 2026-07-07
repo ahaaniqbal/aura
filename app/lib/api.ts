@@ -143,6 +143,14 @@ export const getGraph = async (): Promise<{ people: GraphPerson[]; promises: Pro
   } catch (e) { return { people: [], promises: [] }; }
 };
 export const getBrief = () => post("brief", {});
+// emotional pulse: the user's own state over time (one-tap check-ins + self-mentions in capture)
+export type PulseDay = { day: string; valence: number | null };
+export type Pulse = { entries: any[]; days: PulseDay[]; todayLogged: boolean; avg7: number | null; reflection: string; count: number };
+export const getPulse = async (): Promise<Pulse> => {
+  try { const d = await post("pulse", { op: "recent" }); return { entries: d?.entries || [], days: d?.days || [], todayLogged: !!d?.todayLogged, avg7: d?.avg7 ?? null, reflection: d?.reflection || "", count: d?.count || 0 }; }
+  catch (e) { return { entries: [], days: [], todayLogged: false, avg7: null, reflection: "", count: 0 }; }
+};
+export const logPulse = (valence: number, mood: string) => post("pulse", { op: "log", valence, mood, source: "app" });
 // ambient capture: a conversation transcript -> people + promises + emotional weight -> graph + warm summary
 export const capture = (text: string) => post("capture", { text });
 export const closePromise = (text: string) => post("graph", { op: "close_promise", text });
