@@ -42,9 +42,9 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
       return json({ ok: true });
     }
 
-    // op list: scheduled reminders (coming back) + recent dateless captures (remembered)
+    // op list: date reminders (coming back) + place reminders (when you're there) + recent captures
     const sc = await ctx.db.query(
-      "SELECT id, title, payload FROM actions WHERE user_id=$1 AND kind='reminder' AND state='scheduled' ORDER BY (payload->>'due_at')::timestamptz ASC NULLS LAST LIMIT 50",
+      "SELECT id, title, payload FROM actions WHERE user_id=$1 AND kind='reminder' AND state='scheduled' AND (payload->>'trigger' IS DISTINCT FROM 'place') ORDER BY (payload->>'due_at')::timestamptz ASC NULLS LAST LIMIT 50",
       [userId]
     );
     const scheduled = (sc.rows || []).map((r: any) => {
@@ -52,13 +52,18 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
       const m = meta(dueAt);
       return { id: r.id, text: r.payload?.text || r.title || "", due_at: dueAt, day: r.payload?.day || null, label: m.label, bucket: m.bucket };
     });
+    const pl = await ctx.db.query(
+      "SELECT id, title, payload FROM actions WHERE user_id=$1 AND kind='reminder' AND state='scheduled' AND payload->>'trigger'='place' ORDER BY created_at DESC LIMIT 30",
+      [userId]
+    );
+    const places = (pl.rows || []).map((r: any) => ({ id: r.id, text: r.payload?.text || r.title || "", place: r.payload?.place || "" }));
     const rm = await ctx.db.query(
       "SELECT id, content, created_at FROM messages WHERE user_id=$1 AND role='aura' AND kind='capture' ORDER BY created_at DESC LIMIT 20",
       [userId]
     );
     const remembered = (rm.rows || []).map((r: any) => ({ id: r.id, text: r.content, created_at: r.created_at }));
 
-    return json({ ok: true, scheduled, remembered });
+    return json({ ok: true, scheduled, places, remembered });
   } catch (e: any) {
     console.error("remember error:", String(e));
     return json({ error: String(e) }, 500);

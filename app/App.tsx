@@ -28,7 +28,7 @@ import PersonSheet from "./components/PersonSheet";
 import PulseCard from "./components/PulseCard";
 import { closeness, warmth, isDrifting, contactStats } from "./lib/weight";
 import CaptureMoment from "./components/CaptureMoment";
-import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getPulse, getSubscription, GraphPerson, loadSession, login, logout, logPulse, Memory, Message, PromiseItem, Pulse, registerDevice, setLocation, setTimezone, signup, simulate, subscribe, syncEmail, captureThought, CaptureResult, getRemember, rememberDone, Reminder, Remembered } from "./lib/api";
+import { addNote, agent, approve, Card, clearChat, closePromise, connect, Feed, getBrief, getConnections, getFeed, getGraph, getPlans, getPulse, getSubscription, GraphPerson, loadSession, login, logout, logPulse, Memory, Message, PromiseItem, Pulse, registerDevice, setLocation, setTimezone, signup, simulate, subscribe, syncEmail, captureThought, CaptureResult, getRemember, rememberDone, Reminder, PlaceReminder, Remembered } from "./lib/api";
 
 const INPUT_LINE_H = 22;
 const INPUT_MAX_H = 120;
@@ -127,7 +127,7 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   const onPulse = useCallback(async (v: number, mood: string) => {
     try { await logPulse(v, mood); await loadPulse(); } catch (e) {}
   }, [loadPulse]);
-  const [remember, setRemember] = useState<{ scheduled: Reminder[]; remembered: Remembered[] }>({ scheduled: [], remembered: [] });
+  const [remember, setRemember] = useState<{ scheduled: Reminder[]; places: PlaceReminder[]; remembered: Remembered[] }>({ scheduled: [], places: [], remembered: [] });
   const loadRemember = useCallback(async () => { try { setRemember(await getRemember()); } catch (e) {} }, []);
   const captureNote = useCallback(async (text: string): Promise<CaptureResult> => {
     const r = await captureThought(text);
@@ -146,10 +146,11 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
       if (status !== "granted") return;
       const pos = await Location.getCurrentPositionAsync({});
       const geo = await Location.reverseGeocodeAsync({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
-      const place = geo[0]?.district || geo[0]?.city || geo[0]?.subregion || "nearby";
-      await setLocation(pos.coords.latitude, pos.coords.longitude, place);
+      const place = geo[0]?.name || geo[0]?.district || geo[0]?.city || geo[0]?.subregion || "nearby";
+      const res = await setLocation(pos.coords.latitude, pos.coords.longitude, place);
+      if (res?.surfaced?.length) refresh(); // a place-triggered reminder just fired
     } catch (e) { /* ignore */ }
-  }, []);
+  }, [refresh]);
 
   useEffect(() => {
     (async () => {
@@ -173,8 +174,9 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
         if (status !== "granted") return;
         const pos = await Location.getCurrentPositionAsync({});
         const geo = await Location.reverseGeocodeAsync({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
-        const place = geo[0]?.district || geo[0]?.city || geo[0]?.subregion || "nearby";
-        await setLocation(pos.coords.latitude, pos.coords.longitude, place);
+        const place = geo[0]?.name || geo[0]?.district || geo[0]?.city || geo[0]?.subregion || "nearby";
+        const res = await setLocation(pos.coords.latitude, pos.coords.longitude, place);
+        if (res?.surfaced?.length) refresh();
       } catch (e) { /* ignore */ }
     })();
   }, [refresh]);
@@ -651,14 +653,14 @@ function InlineCard({ card, onAct, busy }: { card: Card; onAct: (c: Card, d: "ap
   );
 }
 
-const CHIP_TONE: Record<string, string> = { date: c.blue, person: c.pink, gift: c.pink, promise: c.coral, reminder: c.accent, idea: c.muted };
+const CHIP_TONE: Record<string, string> = { date: c.blue, person: c.pink, gift: c.pink, promise: c.coral, reminder: c.accent, place: c.mint, idea: c.muted };
 const BUCKETS: { key: string; label: string }[] = [{ key: "today", label: "today" }, { key: "tomorrow", label: "tomorrow" }, { key: "week", label: "this week" }, { key: "later", label: "later" }];
 const BUCKET_COLOR: Record<string, string> = { today: c.accent, tomorrow: c.blue, week: c.mint, later: c.muted };
 
 // The capture screen. Not a notes app: a frictionless brain-dump that files itself and comes
 // back. Dump a thought, aura shows what it caught and when it'll return it, and the lists below
 // are your future self on a timeline (coming back to you) plus what got remembered.
-function NotesView({ onCapture, data, onDone, onLoad, busy }: { onCapture: (t: string) => Promise<CaptureResult>; data: { scheduled: Reminder[]; remembered: Remembered[] }; onDone: (id: string) => void; onLoad: () => void; busy: boolean }) {
+function NotesView({ onCapture, data, onDone, onLoad, busy }: { onCapture: (t: string) => Promise<CaptureResult>; data: { scheduled: Reminder[]; places: PlaceReminder[]; remembered: Remembered[] }; onDone: (id: string) => void; onLoad: () => void; busy: boolean }) {
   const [d, setD] = useState("");
   const [caught, setCaught] = useState<CaptureResult | null>(null);
   const [sending, setSending] = useState(false);
@@ -670,8 +672,8 @@ function NotesView({ onCapture, data, onDone, onLoad, busy }: { onCapture: (t: s
     try { const r = await onCapture(t); setCaught(r); setD(""); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); }
     catch (e) {} finally { setSending(false); }
   };
-  const scheduled = data.scheduled || [], remembered = data.remembered || [];
-  const hasAny = scheduled.length > 0 || remembered.length > 0;
+  const scheduled = data.scheduled || [], places = data.places || [], remembered = data.remembered || [];
+  const hasAny = scheduled.length > 0 || places.length > 0 || remembered.length > 0;
   return (
     <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
       <ScrollView style={s.fill} contentContainerStyle={s.pageScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -726,6 +728,19 @@ function NotesView({ onCapture, data, onDone, onLoad, busy }: { onCapture: (t: s
           </>
         ) : null}
 
+        {places.length ? (
+          <>
+            <Text style={ns.section}>when you're there</Text>
+            {places.map((r) => (
+              <View key={r.id} style={ns.rem}>
+                <View style={ns.remPlace}><Feather name="map-pin" size={10} color="#fff" /><Text style={ns.remDayTxt}>{r.place}</Text></View>
+                <Text style={ns.remTxt} numberOfLines={2}>{r.text}</Text>
+                <Press onPress={() => onDone(r.id)} hitSlop={6} style={ns.remCheck}><Feather name="check" size={16} color={c.mint} /></Press>
+              </View>
+            ))}
+          </>
+        ) : null}
+
         {remembered.length ? (
           <>
             <Text style={ns.section}>remembered</Text>
@@ -762,6 +777,7 @@ const ns = StyleSheet.create({
   rem: { flexDirection: "row", alignItems: "center", gap: 11, backgroundColor: "#fff", borderRadius: 18, padding: 12, marginBottom: 8, ...shadow.soft },
   remDay: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, minWidth: 54, alignItems: "center" },
   remDayTxt: { fontFamily: font.bold, fontSize: 11.5, color: "#fff", letterSpacing: -0.2 },
+  remPlace: { flexDirection: "row", alignItems: "center", gap: 3, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5, backgroundColor: c.mint },
   remTxt: { fontFamily: font.medium, fontSize: 15, lineHeight: 20, color: c.ink, letterSpacing: -0.2, flex: 1 },
   remCheck: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(31,208,160,0.12)" },
   memo: { backgroundColor: "#fff", borderRadius: 16, padding: 13, marginBottom: 8, ...shadow.soft },

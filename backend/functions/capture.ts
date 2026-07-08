@@ -77,13 +77,13 @@ return STRICT json only, all lowercase, no em dashes:
 {
  "people":[{"name":str,"relation":"family"|"friend"|"client"|"collaborator"|"partner"|null,"note":str,"birthday":"MM-DD or null","wants":[str]}],
  "promises":[{"text":str,"person":str_or_null,"direction":"i_owe"|"owed_to_me"|null,"due":"YYYY-MM-DD, a weekday, or null"}],
- "reminders":[{"text":str,"when":"YYYY-MM-DD or null"}],
+ "reminders":[{"text":str,"when":"YYYY-MM-DD or null","place":"a named venue or null"}],
  "care":[{"person":str,"note":str}],
  "self":{"valence":int,"mood":str,"note":str},
  "summary":str
 }
 notes:
-- "reminders" are things to resurface to the user, a task, an errand, a note to self, an idea to revisit. "when" is the day it should come back (absolute YYYY-MM-DD), or null if it has no timing. a self-task ("remind me to...") is a reminder, not a promise.
+- "reminders" are things to resurface to the user, a task, an errand, a note to self, an idea to revisit. "when" is the day it should come back (absolute YYYY-MM-DD), or null if it has no timing. "place" is a named venue to trigger it at ("trader joe's", "the office", "equinox") if the thought is "remind me when i'm at X", else null. a self-task ("remind me to...") is a reminder, not a promise.
 - "promises" are commitments to OTHER people, not tasks for yourself.
 - "wants" is gift and preference memory for a person. "care" is the emotional weight for other people (stress, grief, big changes), not neutral facts. "self" is the USER'S OWN state, only if evident (valence -2 rough..2 great, null if not).
 - "summary" is one warm sentence to the user, what you caught and what you'll do with it, in aura's voice.
@@ -113,15 +113,25 @@ notes:
       const rtext = (r?.text || "").toString().trim();
       if (!rtext) continue;
       const when = /^\d{4}-\d{2}-\d{2}$/.test(r?.when || "") ? r.when : null;
+      const place = (r?.place && String(r.place).toLowerCase() !== "null") ? String(r.place).trim().slice(0, 80) : "";
       if (when) {
         try {
           await ctx.db.query(
             "INSERT INTO actions (user_id, kind, title, payload, state) VALUES ($1,'reminder',$2,$3,'scheduled')",
-            [userId, rtext.slice(0, 120), JSON.stringify({ text: rtext, due_at: `${when}T09:00:00Z`, day: when, source: "capture" })]
+            [userId, rtext.slice(0, 120), JSON.stringify({ text: rtext, due_at: `${when}T09:00:00Z`, day: when, trigger: "date", source: "capture" })]
           );
           scheduled++;
           chips.push({ label: dayLabel(when, todayStr), tone: "date" });
         } catch (e) { console.warn("reminder insert:", String(e)); }
+      } else if (place) {
+        try {
+          await ctx.db.query(
+            "INSERT INTO actions (user_id, kind, title, payload, state) VALUES ($1,'reminder',$2,$3,'scheduled')",
+            [userId, rtext.slice(0, 120), JSON.stringify({ text: rtext, place, trigger: "place", source: "capture" })]
+          );
+          scheduled++;
+          chips.push({ label: place.toLowerCase(), tone: "place" });
+        } catch (e) { console.warn("place reminder insert:", String(e)); }
       } else {
         chips.push({ label: "remembered", tone: "idea" });
       }

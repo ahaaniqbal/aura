@@ -116,7 +116,10 @@ export const simulate = (scenario: string, extra: any = {}) => post("simulate", 
 export const addNote = (text: string) => post("note", { text });
 export const syncEmail = () => post("sync_email", {});
 export const clearChat = () => post("reset", { keep_memories: true });
-export const setLocation = (lat: number, lng: number, place: string) => post("set_location", { lat, lng, place });
+export const setLocation = async (lat: number, lng: number, place: string): Promise<{ surfaced: any[] }> => {
+  try { const d = await post("set_location", { lat, lng, place }); return { surfaced: d?.surfaced || [] }; }
+  catch (e) { return { surfaced: [] }; }
+};
 export const setTimezone = (timezone: string) => post("set_timezone", { timezone });
 export const transcribe = async (audio_base64: string, mime = "audio/m4a"): Promise<string> => {
   try {
@@ -162,10 +165,11 @@ export const captureThought = async (text: string): Promise<CaptureResult> => {
   return { summary: d?.summary || "got it, i've remembered that.", chips: d?.chips || [], reminders: d?.reminders || 0, people: d?.people || 0, promises: d?.promises || 0 };
 };
 export type Reminder = { id: string; text: string; due_at: string; day: string | null; label: string; bucket: string };
+export type PlaceReminder = { id: string; text: string; place: string };
 export type Remembered = { id: string; text: string; created_at: string };
-export const getRemember = async (): Promise<{ scheduled: Reminder[]; remembered: Remembered[] }> => {
-  try { const d = await post("remember", { op: "list" }); return { scheduled: d?.scheduled || [], remembered: d?.remembered || [] }; }
-  catch (e) { return { scheduled: [], remembered: [] }; }
+export const getRemember = async (): Promise<{ scheduled: Reminder[]; places: PlaceReminder[]; remembered: Remembered[] }> => {
+  try { const d = await post("remember", { op: "list" }); return { scheduled: d?.scheduled || [], places: d?.places || [], remembered: d?.remembered || [] }; }
+  catch (e) { return { scheduled: [], places: [], remembered: [] }; }
 };
 export const rememberDone = (id: string) => post("remember", { op: "done", id });
 export const closePromise = (text: string) => post("graph", { op: "close_promise", text });
