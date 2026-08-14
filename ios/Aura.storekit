@@ -1,0 +1,69 @@
+{
+  "identifier": "AURA-STOREKIT-CONFIG-0001",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {},
+  "subscriptionGroups": [
+    {
+      "id": "21600001",
+      "localizations": [],
+      "name": "Aura",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "5000.00",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "6F000002",
+          "introductoryOffer": {
+            "internalID": "6F0000A1",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P1M"
+          },
+          "localizations": [
+            {
+              "description": "Everything, with no daily limit",
+              "displayName": "Aura Unlimited",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "aura.pro.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Aura Pro Yearly",
+          "subscriptionGroupID": "21600001",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "3000.00",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "6F000001",
+          "introductoryOffer": {
+            "internalID": "6F0000A2",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P1M"
+          },
+          "localizations": [
+            {
+              "description": "Full AI brain and voice, generous daily use",
+              "displayName": "Aura",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "aura.plus.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Aura Plus Yearly",
+          "subscriptionGroupID": "21600001",
+          "type": "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

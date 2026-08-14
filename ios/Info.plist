@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Aura</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>2.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.danish.aura</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>aura</string>
+			</array>
+		</dict>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>aura shows today's events on your today screen and can answer questions about your day. calendar data never leaves this phone.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>aura imports birthdays from your contacts so you never miss one. contacts never leave this phone.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>aura listens only while the mic is on, so you can talk instead of type.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>aura turns your voice into text with apple's speech recognition, on this device whenever your language supports it.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>aura notices when you're near a place from your reminders, like a pharmacy for your medicines.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>with always access, aura can nudge you about place reminders even when the app is closed.</string>
+</dict>
+</plist>

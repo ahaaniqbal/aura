@@ -1,0 +1,1986 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "  · a tiny hello goes a long way": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "  · एक छोटा-सा हेलो भी बहुत कुछ कह जाता है"
+          }
+        }
+      }
+    },
+    " · gift idea: %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · गिफ़्ट आइडिया: %@"
+          }
+        }
+      }
+    },
+    "%@ is in your circle now": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ अब आपके सर्कल में है"
+          }
+        }
+      }
+    },
+    "%@%@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@%@"
+          }
+        }
+      }
+    },
+    "%@%@: %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@%@: %@"
+          }
+        }
+      }
+    },
+    "%@'s birthday": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ का जन्मदिन"
+          }
+        }
+      }
+    },
+    "%@'s birthday is %@, kept": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ का जन्मदिन %@ है, याद रख लिया"
+          }
+        }
+      }
+    },
+    "%@'s birthday is today 🎂": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आज %@ का जन्मदिन है 🎂"
+          }
+        }
+      }
+    },
+    "%@, slipped": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, निकल गया"
+          }
+        }
+      }
+    },
+    "%lld open": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld बाक़ी"
+          }
+        }
+      }
+    },
+    "%lldd overdue": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld दिन लेट"
+          }
+        }
+      }
+    },
+    "A little note goes a long way.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "एक छोटा-सा मैसेज भी दिल छू जाता है।"
+          }
+        }
+      }
+    },
+    "AI & privacy": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI और प्राइवेसी"
+          }
+        }
+      }
+    },
+    "AI chat is on, via %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI चैट चालू है, %@ के ज़रिए"
+          }
+        }
+      }
+    },
+    "Add context": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "जानकारी जोड़ें"
+          }
+        }
+      }
+    },
+    "Agree and switch on": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "सहमत हूँ, चालू करें"
+          }
+        }
+      }
+    },
+    "Allow notifications": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "नोटिफ़िकेशन की अनुमति दें"
+          }
+        }
+      }
+    },
+    "Aura Unlimited: ₹5,000 or $199, no daily limit": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aura Unlimited: ₹5,000 या $199, कोई रोज़ की सीमा नहीं"
+          }
+        }
+      }
+    },
+    "Aura will forget everything: people, promises, chat, notes. A backup file stays in the app's documents, your settings stay. Sure?": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aura सब कुछ भूल जाएगी: लोग, वादे, चैट, नोट्स। एक बैकअप फ़ाइल ऐप के documents में रहेगी, आपकी सेटिंग्स बनी रहेंगी। पक्का?"
+          }
+        }
+      }
+    },
+    "Aura, at full strength": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aura, पूरी ताक़त के साथ"
+          }
+        }
+      }
+    },
+    "Aura: ₹3,000 a year in India, $149 outside": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aura: भारत में ₹3,000 सालाना, बाहर $149"
+          }
+        }
+      }
+    },
+    "Automatic": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ऑटोमैटिक"
+          }
+        }
+      }
+    },
+    "Before Aura's AI switches on": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aura का AI चालू होने से पहले"
+          }
+        }
+      }
+    },
+    "Birthday": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "जन्मदिन"
+          }
+        }
+      }
+    },
+    "Calendar access is off for Aura. Open Settings": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aura के लिए कैलेंडर की अनुमति बंद है। Settings खोलें"
+          }
+        }
+      }
+    },
+    "Calendar and contacts are read on this phone and never leave it. iPhone gives no app access to SMS or WhatsApp, so Aura does not ask.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "कैलेंडर और कॉन्टैक्ट्स इसी फ़ोन पर पढ़े जाते हैं और कहीं नहीं जाते। iPhone किसी ऐप को SMS या WhatsApp की पहुँच नहीं देता, इसलिए Aura माँगती भी नहीं।"
+          }
+        }
+      }
+    },
+    "Chat": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "चैट"
+          }
+        }
+      }
+    },
+    "Checking in": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "हालचाल"
+          }
+        }
+      }
+    },
+    "Close": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बंद करें"
+          }
+        }
+      }
+    },
+    "Coming up": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आने वाला है"
+          }
+        }
+      }
+    },
+    "Connect calendar": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "कैलेंडर जोड़ें"
+          }
+        }
+      }
+    },
+    "Connections": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "कनेक्शन"
+          }
+        }
+      }
+    },
+    "Contacts access is off for Aura": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aura के लिए कॉन्टैक्ट्स की अनुमति बंद है"
+          }
+        }
+      }
+    },
+    "Copy": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "कॉपी करें"
+          }
+        }
+      }
+    },
+    "Debug builds only. A dev key unlocks Pro locally and talks to Gemini directly, no relay needed.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "सिर्फ़ debug बिल्ड के लिए। Dev key लोकल में Pro अनलॉक करती है और सीधे Gemini से बात करती है, रिले की ज़रूरत नहीं।"
+          }
+        }
+      }
+    },
+    "Decline and Aura still works: reminders, birthdays and the simpler offline brain, with nothing sent anywhere.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "मना भी कर दें तो Aura फिर भी काम करती है: रिमाइंडर, जन्मदिन और सादा ऑफ़लाइन ब्रेन, और कुछ भी कहीं नहीं भेजा जाता।"
+          }
+        }
+      }
+    },
+    "Delete": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "हटाएँ"
+          }
+        }
+      }
+    },
+    "Delete note": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "नोट हटाएँ"
+          }
+        }
+      }
+    },
+    "Delete: %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "हटाएँ: %@"
+          }
+        }
+      }
+    },
+    "Developer": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "डेवलपर"
+          }
+        }
+      }
+    },
+    "Dictate": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बोलकर लिखें"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "हो गया"
+          }
+        }
+      }
+    },
+    "Draft a message": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "मैसेज ड्राफ़्ट करें"
+          }
+        }
+      }
+    },
+    "Draft the note": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "नोट ड्राफ़्ट करें"
+          }
+        }
+      }
+    },
+    "English (India)": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "अंग्रेज़ी (भारत)"
+          }
+        }
+      }
+    },
+    "Every new member's first month is free": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "हर नए मेंबर का पहला महीना मुफ़्त"
+          }
+        }
+      }
+    },
+    "Everything Aura knows lives in one file on this phone. Export it any time, take it anywhere. That is the deal, in one line.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aura जो कुछ भी जानती है, वो इसी फ़ोन पर एक फ़ाइल में रहता है। जब चाहें एक्सपोर्ट करें, कहीं भी ले जाएँ। बस यही सौदा है, एक लाइन में।"
+          }
+        }
+      }
+    },
+    "Everything, no daily limit": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "सब कुछ, कोई रोज़ की सीमा नहीं"
+          }
+        }
+      }
+    },
+    "Export everything": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "सब कुछ एक्सपोर्ट करें"
+          }
+        }
+      }
+    },
+    "Forget %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ को भुला दें"
+          }
+        }
+      }
+    },
+    "Forget everything": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "सब कुछ भुला दें"
+          }
+        }
+      }
+    },
+    "Free always includes reminders, birthdays, place nudges and the offline brain. Paid plans start with a free month and add the full AI brain and voice; Unlimited removes the daily cap.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "फ़्री में हमेशा रिमाइंडर, जन्मदिन, जगह की याद और ऑफ़लाइन ब्रेन मिलते हैं। पेड प्लान एक मुफ़्त महीने से शुरू होते हैं और पूरा AI ब्रेन व वॉयस जोड़ते हैं; Unlimited रोज़ की सीमा हटा देता है।"
+          }
+        }
+      }
+    },
+    "Free always includes reminders, birthdays, place nudges and the offline brain. Plus adds Aura's full AI brain in chat. Pro adds voice, both ways.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "फ़्री में हमेशा मिलते हैं रिमाइंडर, जन्मदिन, जगह पर याद दिलाना और ऑफ़लाइन ब्रेन। Plus चैट में Aura का पूरा AI ब्रेन जोड़ता है। Pro में वॉयस भी, दोनों तरफ़।"
+          }
+        }
+      }
+    },
+    "From your calendar": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आपके कैलेंडर से"
+          }
+        }
+      }
+    },
+    "Full AI brain + voice, both ways": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पूरा AI ब्रेन + वॉयस, दोनों तरफ़"
+          }
+        }
+      }
+    },
+    "Full AI brain + voice, generous daily use": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पूरा AI ब्रेन + वॉयस, रोज़ के लिए काफ़ी"
+          }
+        }
+      }
+    },
+    "Full AI brain in chat": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "चैट में पूरा AI ब्रेन"
+          }
+        }
+      }
+    },
+    "Gemini API key (dev only)": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemini API key (सिर्फ़ dev के लिए)"
+          }
+        }
+      }
+    },
+    "Gift ideas": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "गिफ़्ट आइडियाज़"
+          }
+        }
+      }
+    },
+    "Gone quiet": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "चुप हो गए"
+          }
+        }
+      }
+    },
+    "I'm feeling %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "मेरा मूड %@ है"
+          }
+        }
+      }
+    },
+    "Import a palace file": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पैलेस फ़ाइल इंपोर्ट करें"
+          }
+        }
+      }
+    },
+    "Import an Aura backup": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aura का बैकअप इम्पोर्ट करें"
+          }
+        }
+      }
+    },
+    "Import birthdays from Contacts": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "कॉन्टैक्ट्स से जन्मदिन लाएँ"
+          }
+        }
+      }
+    },
+    "Imported %lld people with birthdays": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld लोगों के जन्मदिन आ गए"
+          }
+        }
+      }
+    },
+    "Into": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "इनकी पसंद"
+          }
+        }
+      }
+    },
+    "It's time. You asked me to bring this back right now.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "समय हो गया। आपने कहा था, इसे अभी याद दिलाऊँ।"
+          }
+        }
+      }
+    },
+    "Keep": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "रख लें"
+          }
+        }
+      }
+    },
+    "Location is off for Aura. Open Settings": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aura के लिए लोकेशन बंद है। सेटिंग्स खोलें"
+          }
+        }
+      }
+    },
+    "Location nudges": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "जगह पर याद दिलाना"
+          }
+        }
+      }
+    },
+    "Manage subscription": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "सब्सक्रिप्शन मैनेज करें"
+          }
+        }
+      }
+    },
+    "Mark done": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पूरा मार्क करें"
+          }
+        }
+      }
+    },
+    "Mark done: %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पूरा मार्क करें: %@"
+          }
+        }
+      }
+    },
+    "No one here yet": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "यहाँ अभी कोई नहीं"
+          }
+        }
+      }
+    },
+    "Not now": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "अभी नहीं"
+          }
+        }
+      }
+    },
+    "Not now, stay offline": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "अभी नहीं, ऑफ़लाइन ही रहें"
+          }
+        }
+      }
+    },
+    "Notes": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "नोट्स"
+          }
+        }
+      }
+    },
+    "Nothing jotted yet": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "अभी कुछ नहीं लिखा"
+          }
+        }
+      }
+    },
+    "Nothing on the calendar today": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आज कैलेंडर में कुछ नहीं है"
+          }
+        }
+      }
+    },
+    "Notifications & location": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "नोटिफ़िकेशन और लोकेशन"
+          }
+        }
+      }
+    },
+    "Open between you": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आप दोनों के बीच बाक़ी"
+          }
+        }
+      }
+    },
+    "People": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "लोग"
+          }
+        }
+      }
+    },
+    "Plans didn't load from the App Store. Check your connection and come back, everything here will be waiting.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Store से प्लान लोड नहीं हुए। इंटरनेट देखकर फिर आइए, सब यहीं मिलेगा।"
+          }
+        }
+      }
+    },
+    "Privacy policy": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "प्राइवेसी पॉलिसी"
+          }
+        }
+      }
+    },
+    "Promise": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "वादा"
+          }
+        }
+      }
+    },
+    "Read the privacy policy": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "प्राइवेसी पॉलिसी पढ़ें"
+          }
+        }
+      }
+    },
+    "Relationship": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "रिश्ता"
+          }
+        }
+      }
+    },
+    "Relay URL override": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relay URL ओवरराइड"
+          }
+        }
+      }
+    },
+    "Reminder": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "रिमाइंडर"
+          }
+        }
+      }
+    },
+    "Reminders, birthdays, offline brain": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "रिमाइंडर, जन्मदिन, ऑफ़लाइन ब्रेन"
+          }
+        }
+      }
+    },
+    "Report a problem": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "कोई समस्या रिपोर्ट करें"
+          }
+        }
+      }
+    },
+    "Report this response": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "इस जवाब की रिपोर्ट करें"
+          }
+        }
+      }
+    },
+    "Save dev key": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dev key सेव करें"
+          }
+        }
+      }
+    },
+    "Say hi": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "हाय कह दें"
+          }
+        }
+      }
+    },
+    "Send": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "भेजें"
+          }
+        }
+      }
+    },
+    "Set location to Always for nudges with the app closed": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ऐप बंद होने पर भी याद दिलाने के लिए लोकेशन को Always पर रखें"
+          }
+        }
+      }
+    },
+    "Settings": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "सेटिंग्स"
+          }
+        }
+      }
+    },
+    "Show calendar in Today": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today में कैलेंडर दिखाएँ"
+          }
+        }
+      }
+    },
+    "Snooze 10 min": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "10 मिनट स्नूज़"
+          }
+        }
+      }
+    },
+    "Spoken replies": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बोलकर जवाब"
+          }
+        }
+      }
+    },
+    "Stop dictation": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "डिक्टेशन रोकें"
+          }
+        }
+      }
+    },
+    "Switch on AI chat": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI चैट चालू करें"
+          }
+        }
+      }
+    },
+    "The free version always keeps reminders, birthdays and your data on this phone. Plus switches on Aura's full AI brain in chat. Pro adds voice, both ways, in English and Hindi.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "फ़्री वर्शन में रिमाइंडर, जन्मदिन और आपका डेटा हमेशा इसी फ़ोन पर रहते हैं। Plus चैट में Aura का पूरा AI ब्रेन चालू कर देता है। Pro में वॉयस भी जुड़ जाती है, दोनों तरफ़, इंग्लिश और हिंदी में।"
+          }
+        }
+      }
+    },
+    "They're obsessed with %@.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "वो %@ के दीवाने हैं।"
+          }
+        }
+      }
+    },
+    "Timed reminders and birthdays fire as real notifications, app closed, scheduled by iOS itself. Place nudges work best with location set to Always, so iOS can wake Aura when you're out.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "समय वाले रिमाइंडर और जन्मदिन असली नोटिफ़िकेशन की तरह आते हैं, ऐप बंद होने पर भी — iOS ख़ुद इन्हें शेड्यूल करता है। जगह पर याद दिलाना सबसे अच्छा तब चलता है जब लोकेशन Always पर हो, ताकि आपके बाहर होने पर iOS Aura को जगा सके।"
+          }
+        }
+      }
+    },
+    "Today": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आज"
+          }
+        }
+      }
+    },
+    "Try saying": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ये बोलकर देखें"
+          }
+        }
+      }
+    },
+    "Turn AI chat off": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI चैट बंद करें"
+          }
+        }
+      }
+    },
+    "Unlock Aura Plus": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aura Plus अनलॉक करें"
+          }
+        }
+      }
+    },
+    "Upgrade": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "अपग्रेड करें"
+          }
+        }
+      }
+    },
+    "Version %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "वर्शन %@"
+          }
+        }
+      }
+    },
+    "Voice language": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "वॉयस की भाषा"
+          }
+        }
+      }
+    },
+    "When you chat, your message and the relevant parts of your Aura memory are sent to %@ to write the reply.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "चैट करते समय, आपका मैसेज और आपकी Aura याददाश्त के ज़रूरी हिस्से जवाब लिखने के लिए %@ को भेजे जाते हैं।"
+          }
+        }
+      }
+    },
+    "When you're out": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "जब आप बाहर हों"
+          }
+        }
+      }
+    },
+    "With AI chat on, your message and the relevant parts of your memory are sent to %@ to write replies. Your memory itself stays in one file on this phone. Aura's relay keeps nothing.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI चैट चालू होने पर, आपका मैसेज और आपकी याददाश्त के ज़रूरी हिस्से जवाब लिखने के लिए %@ को भेजे जाते हैं। आपकी याददाश्त ख़ुद इसी फ़ोन पर एक फ़ाइल में रहती है। Aura का रिले कुछ नहीं रखता।"
+          }
+        }
+      }
+    },
+    "Worth remembering": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "याद रखने लायक"
+          }
+        }
+      }
+    },
+    "You": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आप"
+          }
+        }
+      }
+    },
+    "You asked me to bring this back today.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आपने कहा था, इसे आज याद दिलाऊँ।"
+          }
+        }
+      }
+    },
+    "You're nearby": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आप पास में हैं"
+          }
+        }
+      }
+    },
+    "You're on the simple brain. Try the full one free for a month": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "अभी आप सादे ब्रेन पर हैं। पूरा ब्रेन एक महीना मुफ़्त आज़माएँ"
+          }
+        }
+      }
+    },
+    "You're on the simple brain. Unlock Aura Plus": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "अभी आप सिंपल ब्रेन पर हैं। Aura Plus अनलॉक करें"
+          }
+        }
+      }
+    },
+    "Your data": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आपका डेटा"
+          }
+        }
+      }
+    },
+    "Your first month is free. Both plans include Aura's full AI brain and voice, in English and Hindi. Unlimited removes the daily usage cap. The free version always keeps reminders, birthdays and your data on this phone.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पहला महीना मुफ़्त है। दोनों प्लान में Aura का पूरा AI ब्रेन और वॉयस शामिल है, English और हिन्दी में। Unlimited रोज़ की सीमा हटा देता है। फ़्री वर्ज़न में रिमाइंडर, जन्मदिन और आपका डेटा हमेशा इसी फ़ोन पर रहता है।"
+          }
+        }
+      }
+    },
+    "Your first month of the full brain is free. Switch it on": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पूरे ब्रेन का पहला महीना मुफ़्त है। चालू कीजिए"
+          }
+        }
+      }
+    },
+    "Your memory itself stays in one file on this phone. Aura's relay server keeps nothing.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आपकी याददाश्त ख़ुद इसी फ़ोन पर एक फ़ाइल में रहती है। Aura का रिले सर्वर कुछ नहीं रखता।"
+          }
+        }
+      }
+    },
+    "Your name, for the greeting": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आपका नाम, ग्रीटिंग के लिए"
+          }
+        }
+      }
+    },
+    "Your plan": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आपका प्लान"
+          }
+        }
+      }
+    },
+    "a gift idea or something they love…": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "कोई गिफ़्ट आइडिया या जो इन्हें बहुत पसंद है…"
+          }
+        }
+      }
+    },
+    "about %@ left for this": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "इसके लिए लगभग %@ बचा है"
+          }
+        }
+      }
+    },
+    "all day": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पूरा दिन"
+          }
+        }
+      }
+    },
+    "aura": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "aura"
+          }
+        }
+      }
+    },
+    "aura is thinking…": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "aura सोच रही है…"
+          }
+        }
+      }
+    },
+    "aura remembers your people, your promises and your plans, then surfaces one calm card when something matters. nothing happens without you.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "aura आपके लोग, आपके वादे और आपके प्लान याद रखती है, और जब कुछ मायने रखता है तो बस एक शांत कार्ड सामने रखती है। आपके बिना कुछ नहीं होता।"
+          }
+        }
+      }
+    },
+    "btw, tell me your name in settings and the today screen will greet you properly.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "वैसे, settings में अपना नाम बता दीजिए, फिर today स्क्रीन आपको नाम से नमस्ते कहेगी।"
+          }
+        }
+      }
+    },
+    "busy": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "व्यस्त"
+          }
+        }
+      }
+    },
+    "by %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ तक"
+          }
+        }
+      }
+    },
+    "client": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "क्लाइंट"
+          }
+        }
+      }
+    },
+    "collaborator": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "सहयोगी"
+          }
+        }
+      }
+    },
+    "didn't catch a time in that. say something like 6pm, in 2 hours, kal subah, or tomorrow morning.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "उसमें कोई समय समझ नहीं आया। ऐसे बताइए: 6pm, in 2 hours, kal subah, या tomorrow morning।"
+          }
+        }
+      }
+    },
+    "didn't catch anything to keep there. my simple brain follows simple lines like \"remind me to call mom tomorrow\" ya \"kal doodh lena hai\". the full brain understands everything, english and hindi.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "उसमें रखने लायक कुछ पकड़ नहीं पाई। मेरा सादा ब्रेन सीधी बातें समझता है, जैसे \"remind me to call mom tomorrow\" या \"kal doodh lena hai\"। पूरा ब्रेन सब कुछ समझता है, english और हिन्दी।"
+          }
+        }
+      }
+    },
+    "family": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "परिवार"
+          }
+        }
+      }
+    },
+    "friend": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "दोस्त"
+          }
+        }
+      }
+    },
+    "good": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "अच्छा"
+          }
+        }
+      }
+    },
+    "good afternoon": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "गुड आफ़्टरनून"
+          }
+        }
+      }
+    },
+    "good evening": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "गुड ईवनिंग"
+          }
+        }
+      }
+    },
+    "good morning": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "गुड मॉर्निंग"
+          }
+        }
+      }
+    },
+    "great": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "मस्त"
+          }
+        }
+      }
+    },
+    "hear you. i'll keep things light today 🤍": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "समझ गई। आज सब हल्का रखूँगी 🤍"
+          }
+        }
+      }
+    },
+    "holding onto \"%@\"": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"%@\" संभाल कर रख लिया"
+          }
+        }
+      }
+    },
+    "how you know them, what matters…": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "इन्हें कैसे जानते हैं, क्या बात मायने रखती है…"
+          }
+        }
+      }
+    },
+    "i owe jake a coffee by friday": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "मुझे शुक्रवार तक जेक को कॉफ़ी पिलानी है"
+          }
+        }
+      }
+    },
+    "i'll bring \"%@\" back %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"%1$@\" %2$@ याद दिला दूँगी"
+          }
+        }
+      }
+    },
+    "i'll bring \"%@\" back when you're at %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "जब आप %2$@ पर होंगे, \"%1$@\" याद दिला दूँगी"
+          }
+        }
+      }
+    },
+    "i'll remember the %@ thing": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ वाली बात याद रखूँगी"
+          }
+        }
+      }
+    },
+    "i'm aura": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "मैं aura हूँ"
+          }
+        }
+      }
+    },
+    "in %lld days": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld दिन में"
+          }
+        }
+      }
+    },
+    "in %lld min": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld मिनट में"
+          }
+        }
+      }
+    },
+    "jot a thought, it files itself…": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "कोई बात लिख दीजिए, वो ख़ुद फ़ाइल हो जाएगी…"
+          }
+        }
+      }
+    },
+    "just met": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "अभी-अभी मिले"
+          }
+        }
+      }
+    },
+    "like chat, but quieter. jot a thought and it files itself into memory without replying.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "चैट जैसा, पर शांत। कोई भी बात लिखिए, वह बिना जवाब दिए याददाश्त में दर्ज हो जाती है।"
+          }
+        }
+      }
+    },
+    "like: june 28": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "जैसे: 28 जून"
+          }
+        }
+      }
+    },
+    "locked: %@. i'll nudge you four times between now and then.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पक्का: %@। अब से तब तक मैं आपको चार बार याद दिलाऊँगी।"
+          }
+        }
+      }
+    },
+    "love that for you ✨": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बहुत बढ़िया ✨"
+          }
+        }
+      }
+    },
+    "meh": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "फीका"
+          }
+        }
+      }
+    },
+    "no date": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "कोई तारीख़ नहीं"
+          }
+        }
+      }
+    },
+    "noted": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "नोट कर लिया"
+          }
+        }
+      }
+    },
+    "noted, %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "नोट कर लिया, %@"
+          }
+        }
+      }
+    },
+    "notes land here and file themselves into memory. people, dates, promises, all caught.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "नोट्स यहाँ आते हैं और ख़ुद-ब-ख़ुद याददाश्त में फ़ाइल हो जाते हैं। लोग, तारीख़ें, वादे, सब पकड़ लिए जाते हैं।"
+          }
+        }
+      }
+    },
+    "now": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "अभी"
+          }
+        }
+      }
+    },
+    "okay": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ठीक"
+          }
+        }
+      }
+    },
+    "owed to you": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आपको मिलना है"
+          }
+        }
+      }
+    },
+    "partner": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पार्टनर"
+          }
+        }
+      }
+    },
+    "remind me to call mom tomorrow": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "मुझे कल मम्मी को फ़ोन करना याद दिलाना"
+          }
+        }
+      }
+    },
+    "remind me to get medicines when i'm at the pharmacy": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "remind karna dawai leni hai jab pharmacy ke paas hoon"
+          }
+        }
+      }
+    },
+    "rough": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बेकार"
+          }
+        }
+      }
+    },
+    "sam's birthday is june 28th, he's obsessed with chocolate cake": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "सैम का जन्मदिन 28 जून को है, उसे चॉकलेट केक बहुत पसंद है"
+          }
+        }
+      }
+    },
+    "see your day here, connect calendar in settings": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "अपना दिन यहाँ देखिए, settings में कैलेंडर जोड़िए"
+          }
+        }
+      }
+    },
+    "tell me about your people and your plans, in english ya hindi. i'll quietly keep track, then nudge you at the right moment. everything stays on this phone.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "अपने लोगों और अपने प्लान के बारे में बताइए, इंग्लिश में या हिंदी में। मैं चुपचाप सब याद रखूँगी, और सही मौक़े पर धीरे से याद दिला दूँगी। सब कुछ इसी फ़ोन पर रहता है।"
+          }
+        }
+      }
+    },
+    "tell me about your people in chat, i'll do the remembering.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "चैट में अपने लोगों के बारे में बताइए, याद रखने का काम मेरा।"
+          }
+        }
+      }
+    },
+    "tell me anything…": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "कुछ भी बताइए…"
+          }
+        }
+      }
+    },
+    "they owe you": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "इन्हें आपको देना है"
+          }
+        }
+      }
+    },
+    "this is our thread. i remember everything you tell me here, in english ya hindi.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ये हमारी अपनी थ्रेड है। आप यहाँ जो भी बताते हैं, मुझे सब याद रहता है, इंग्लिश में या हिंदी में।"
+          }
+        }
+      }
+    },
+    "till when do you want this done? say a time like 6pm, or in 2 hours.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "इसे कब तक पूरा करना है? कोई समय बताइए, जैसे 6pm या in 2 hours।"
+          }
+        }
+      }
+    },
+    "today": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आज"
+          }
+        }
+      }
+    },
+    "today %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आज %@"
+          }
+        }
+      }
+    },
+    "today 🎂": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आज 🎂"
+          }
+        }
+      }
+    },
+    "tomorrow": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "कल"
+          }
+        }
+      }
+    },
+    "tomorrow %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "कल %@"
+          }
+        }
+      }
+    },
+    "tracking it": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ध्यान में है"
+          }
+        }
+      }
+    },
+    "tracking it, %@ owes you": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ध्यान में है, %@ को आपको देना है"
+          }
+        }
+      }
+    },
+    "tracking it, for %@": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ध्यान में है, %@ के लिए"
+          }
+        }
+      }
+    },
+    "up late": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "देर तक जगे हैं"
+          }
+        }
+      }
+    },
+    "voice replies are on": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "वॉयस जवाब चालू हो गए"
+          }
+        }
+      }
+    },
+    "was this month worth it?": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "क्या यह महीना काम आया?"
+          }
+        }
+      }
+    },
+    "you owe them": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आपको इन्हें देना है"
+          }
+        }
+      }
+    },
+    "you promised": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आपने वादा किया"
+          }
+        }
+      }
+    },
+    "your free month is ending soon. if aura earned its place, do nothing, your plan simply continues. if not, cancel anytime in your app store settings, no hard feelings.": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "आपका मुफ़्त महीना जल्द ख़त्म हो रहा है। अगर aura ने अपनी जगह बना ली है, तो कुछ मत कीजिए, प्लान अपने आप चलता रहेगा। अगर नहीं, तो app store settings में कभी भी कैंसल कर दीजिए, कोई बात नहीं।"
+          }
+        }
+      }
+    },
+    "हिन्दी": {
+      "localizations": {
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "हिन्दी"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

@@ -1,0 +1,20 @@
+# Aura relay — Cloudflare Worker configuration
+#
+# Replace the KV namespace id below with the one printed by:
+#   wrangler kv namespace create AURA_KV
+#
+# The Gemini API key is a secret, NOT a var — set it with:
+#   wrangler secret put GEMINI_API_KEY
+
+name = "aura-relay"
+main = "worker.js"
+compatibility_date = "2026-08-01"
+
+kv_namespaces = [
+  { binding = "AURA_KV", id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID" }
+]
+
+[vars]
+# Model forwarded to Gemini's OpenAI-compatible endpoint. The Worker strips
+# any client-supplied model and always uses this one.
+MODEL = "gemini-3.1-flash-lite"

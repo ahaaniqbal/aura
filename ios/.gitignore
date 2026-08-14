@@ -1,0 +1,5 @@
+build/
+buildci/
+*.xcresult
+xcuserdata/
+.DS_Store
