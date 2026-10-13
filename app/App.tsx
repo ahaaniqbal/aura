@@ -12,7 +12,10 @@ import CaptureMoment from "./components/CaptureMoment";
 import PersonSheet from "./components/PersonSheet";
 import TabBar, { TabKey } from "./components/TabBar";
 import { isReply } from "./components/ActionCard";
-import { AdultSheet, ConfirmSheet, EditDraftSheet, ProSheet, ScenarioKey, ScenarioSheet } from "./components/Sheets";
+import { AdultSheet, AgentSheet, ReplySheet, ConfirmSheet, EditDraftSheet, McpSheet, MoneySheet, ProSheet, RoutineSheet, ScenarioKey, ScenarioSheet, TripSheet } from "./components/Sheets";
+import Personalize from "./components/Personalize";
+import { open as openUrl } from "./components/Results";
+import { LookProvider } from "./components/look";
 import { Toast } from "./components/ui";
 import AuraScreen from "./screens/AuraScreen";
 import TodayScreen from "./screens/TodayScreen";
@@ -26,8 +29,10 @@ import {
   agent, approve, Card, captureThought, CaptureResult, clearChat, closePromise, connect, DEFAULT_SETTINGS, Feed, forgetAllMemories, forgetMemory,
   getBrief, getConnections, getFeed, getGraph, getPlans, getRemember, getSettings, getSubscription, GraphPerson, loadSession, logout, Memory,
   Personality, PlaceReminder, PromiseItem, registerDevice, Remembered, rememberDone, Reminder, saveSettings, setLocation, setTimezone, Settings,
-  simulate, subscribe, syncEmail,
+  simulate, subscribe, syncEmail, getProfile, forgetFact, ProfileGroup, getRoutines, updateRoutine, runRoutine, deleteRoutine, Routine,
+  getMcpServers, addMcpServer, removeMcpServer, McpServer, getAgents, makeAgentCode, revokeAgent, replyAgent, PairedAgent, getMoney, MoneySummary, getTrips, Trip, deleteAccount,
 } from "./lib/api";
+import { AuraLook, DEFAULT_LOOK } from "./lib/faces";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -46,7 +51,7 @@ Notifications.setNotificationHandler({
 type RememberData = { scheduled: Reminder[]; places: PlaceReminder[]; remembered: Remembered[] };
 type Confirm = { title: string; body: string; confirm: string; run: () => void } | null;
 
-function AuraApp({ onSignOut }: { onSignOut: () => void }) {
+function AuraApp({ onSignOut, onLook }: { onSignOut: () => void; onLook: (l: AuraLook) => void }) {
   const [feed, setFeed] = useState<Feed | null>(null);
   const [tab, setTab] = useState<TabKey>("aura");
   const [draft, setDraft] = useState("");
@@ -73,6 +78,20 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   const [person, setPerson] = useState<GraphPerson | null>(null);
   const [askFocus, setAskFocus] = useState(0);
   const [toast, setToast] = useState<{ text: string; undo?: boolean } | null>(null);
+  const [profile, setProfile] = useState<ProfileGroup[]>([]);
+  const [routines, setRoutines] = useState<Routine[]>([]);
+  const [routineOpen, setRoutineOpen] = useState<Routine | null>(null);
+  const [routineRunning, setRoutineRunning] = useState(false);
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [tripOpen, setTripOpen] = useState<Trip | null>(null);
+  const [money, setMoney] = useState<MoneySummary | null>(null);
+  const [moneyOpen, setMoneyOpen] = useState(false);
+  const [mcp, setMcp] = useState<McpServer[]>([]);
+  const [mcpOpen, setMcpOpen] = useState(false);
+  const [agents, setAgents] = useState<PairedAgent[]>([]);
+  const [pairing, setPairing] = useState<{ code: string; endpoint: string } | null>(null);
+  const [lookOpen, setLookOpen] = useState(false);
+  const [replyTo, setReplyTo] = useState<{ kid: string; from: string; question: string } | null>(null);
   const seen = useRef<Set<string>>(new Set());
   const first = useRef(true);
   const sigRef = useRef("");
@@ -153,7 +172,10 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
       try {
         const res: any = await approve(actionId, decision, edited);
         if (res?.ok === false || res?.error) flash(res?.error === "send_failed" ? "That didn't send. It's still waiting for you." : "That didn't go through. Try again.");
-        else if (decision === "approve") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        else if (decision === "approve") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          if (res?.result?.open_url) openUrl(res.result.open_url); // a table: finish booking on the restaurant's page
+        }
         await refresh();
       } catch (e) { flash("That didn't go through. Check your connection."); }
       finally { unhide(card.id); }
@@ -186,6 +208,75 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
     title: "Forget everything?", body: "Aura will lose every fact it has kept about you. Reminders and people stay. This can't be undone.", confirm: "Forget everything",
     run: async () => {
       try { await forgetAllMemories(); sigRef.current = ""; await refresh(); flash("Aura's memory is clear."); } catch (e) { flash("Couldn't clear memory. Try again."); }
+    },
+  });
+
+  // ---------- what Aura has learned, routines, trips, money ----------
+  const loadExtras = useCallback(() => {
+    getProfile().then(setProfile).catch(() => {});
+    getRoutines().then(setRoutines).catch(() => {});
+    getTrips().then(setTrips).catch(() => {});
+    getMoney().then(setMoney).catch(() => {});
+  }, []);
+  const forgetLearned = (id: string) => {
+    const prev = profile;
+    ease();
+    setProfile(prev.map((g) => ({ ...g, items: g.items.filter((x) => x.id !== id) })));
+    withUndo("Forgotten", async () => {
+      try { await forgetFact(id); } catch (e) { setProfile(prev); flash("Couldn't forget that. Try again."); }
+    }, () => setProfile(prev));
+  };
+  const toggleRoutine = async (r: Routine, on: boolean) => {
+    Haptics.selectionAsync().catch(() => {});
+    const next = { ...r, active: on };
+    setRoutines((xs) => xs.map((x) => (x.id === r.id ? next : x))); setRoutineOpen(next);
+    const res: any = await updateRoutine(r.id, { active: on });
+    if (!res?.routine) { setRoutines((xs) => xs.map((x) => (x.id === r.id ? r : x))); setRoutineOpen(r); flash("Couldn't change that. Try again."); }
+    else { setRoutines((xs) => xs.map((x) => (x.id === r.id ? res.routine : x))); setRoutineOpen(res.routine); flash(on ? `${r.title} is on.` : `${r.title} is off.`); }
+  };
+  const runRoutineNow = async (r: Routine) => {
+    setRoutineRunning(true);
+    try { await runRoutine(r.id); setRoutineOpen(null); setTab("aura"); await refresh(); }
+    catch (e) { flash("Couldn't run it just now. Try again."); }
+    finally { setRoutineRunning(false); }
+  };
+  const editRoutine = (r: Routine) => { setRoutineOpen(null); setDraft(`Change my ${r.title.toLowerCase()} routine: `); openChat(); };
+  const removeRoutine = (r: Routine) => setConfirm({
+    title: `Delete ${r.title}?`, body: "Aura stops doing this. You can always ask for it again.", confirm: "Delete routine",
+    run: async () => { setRoutineOpen(null); setRoutines((xs) => xs.filter((x) => x.id !== r.id)); await deleteRoutine(r.id).catch(() => {}); },
+  });
+  const addMcp = async (url: string, token: string): Promise<string | null> => {
+    const res = await addMcpServer(url, token || undefined);
+    if (!res.ok) return res.error || "Couldn't connect.";
+    setMcpOpen(false); setMcp(await getMcpServers()); flash(`${res.server?.name || "Server"} is connected.`);
+    return null;
+  };
+  const removeMcp = (m: McpServer) => setConfirm({
+    title: `Disconnect ${m.name}?`, body: "Aura won't be able to use its tools anymore.", confirm: "Disconnect",
+    run: async () => { setMcp((xs) => xs.filter((x) => x.id !== m.id)); await removeMcpServer(m.id).catch(() => {}); },
+  });
+  const pairAgent = async () => {
+    Haptics.selectionAsync().catch(() => {});
+    const p = await makeAgentCode();
+    if (p) setPairing(p); else flash("Couldn't make a code. Try again.");
+  };
+  const unpairAgent = (a: PairedAgent) => setConfirm({
+    title: `Remove ${a.label}?`, body: "It loses access right away, including any permission you gave it.", confirm: "Remove agent",
+    run: async () => { setAgents((xs) => xs.filter((x) => x.id !== a.id)); await revokeAgent(a.id).catch(() => {}); },
+  });
+  const saveLook = async (look: AuraLook) => {
+    const prev = settings.look;
+    setLookOpen(false); onLook(look); setSettings({ ...settings, look });
+    const res = await saveSettings({ look });
+    if (!res.ok) { onLook(prev); setSettings({ ...settings, look: prev }); flash("Couldn't save the new look. Try again."); }
+  };
+  const deleteAccountFlow = () => setConfirm({
+    title: "Delete your account?", body: "Aura erases everything it knows about you: your conversation, memory, people, routines, trips, money and connected agents. This can't be undone.", confirm: "Delete everything",
+    run: async () => {
+      const ok = await deleteAccount();
+      if (!ok) { flash("Couldn't delete your account. Try again."); return; }
+      try { await logout(); } catch (e) {}
+      onSignOut();
     },
   });
 
@@ -240,8 +331,9 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
       } catch (e) { /* push token needs a dev build; no-op in Expo Go */ }
     })();
     refresh();
-    getSettings().then(setSettings).catch(() => {});
+    getSettings().then((st) => { setSettings(st); onLook(st.look); }).catch(() => {});
     getConnections().then(setServerConnected).catch(() => {});
+    loadExtras();
     loadGraph();
     loadRemember();
     reportTimezone();
@@ -266,8 +358,14 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
     return () => clearInterval(id);
   }, [tab, refresh]);
 
-  useEffect(() => { if (tab === "today" || tab === "memory") { loadGraph(); loadRemember(); } }, [tab, loadGraph, loadRemember]);
-  useEffect(() => { if (tab === "you") { getConnections().then(setServerConnected).catch(() => {}); getSettings().then(setSettings).catch(() => {}); } }, [tab]);
+  useEffect(() => { if (tab === "today" || tab === "memory") { loadGraph(); loadRemember(); loadExtras(); } }, [tab, loadGraph, loadRemember]);
+  useEffect(() => {
+    if (tab !== "you") return;
+    getConnections().then(setServerConnected).catch(() => {});
+    getSettings().then(setSettings).catch(() => {});
+    getMcpServers().then(setMcp).catch(() => {});
+    getAgents().then(setAgents).catch(() => {});
+  }, [tab]);
 
   const go = (k: TabKey) => { Haptics.selectionAsync().catch(() => {}); setTab(k); };
   const openChat = () => { setTab("aura"); setAskFocus((k) => k + 1); };
@@ -287,12 +385,15 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
   };
   // a request started from elsewhere (a person, the brief): hand it to Aura and follow along in chat
   const askAura = async (text: string) => {
-    const msg = text.trim(); if (!msg) return;
+    const msg = text.trim(); if (!msg || sendingRef.current) return;
+    sendingRef.current = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setTab("aura"); setBusy(true); setThinking(true); setNotice(null);
-    try { await agent(msg, "home"); await refresh(); await loadGraph(); }
+    const tempId = "t" + Date.now();
+    setTab("aura"); setPending((p) => [...p, { id: tempId, content: msg }]);
+    setBusy(true); setThinking(true); setNotice(null);
+    try { await agent(msg); await refresh(); await loadGraph(); }
     catch (e) { setNotice(OFFLINE); }
-    finally { setThinking(false); setBusy(false); }
+    finally { sendingRef.current = false; setPending((p) => p.filter((x) => x.id !== tempId)); setThinking(false); setBusy(false); }
   };
   const openPerson = (name: string) => {
     const key = String(name || "").toLowerCase();
@@ -394,22 +495,25 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
       <View style={s.fill}>
         {tab === "aura" && (
           <AuraScreen feed={feed} pending={pending} thinking={thinking} notice={notice} busy={busy} draft={draft} setDraft={setDraft}
-            onSend={send} onAct={act} onEdit={setEditCard} hidden={hidden} onClear={clearChatFlow} onDemo={() => setDemoOpen(true)}
+            onSend={send} onAsk={askAura} onReplyAgent={setReplyTo} onAct={act} onEdit={setEditCard} hidden={hidden} onClear={clearChatFlow} onDemo={() => setDemoOpen(true)}
             markState={working ? "thinking" : "idle"} subtitle={subtitle} focusKey={askFocus} />
         )}
         {tab === "today" && (
           <TodayScreen loaded={graphLoaded && rememberLoaded && !!feed} approvals={approvals} onAct={act} onEdit={setEditCard} busy={busy}
             scheduled={remember.scheduled} places={remember.places} onReminderDone={onReminderDone}
             promises={graph.promises} people={graph.people} onDone={donePromise} onOpenPerson={openPerson}
-            onAsk={openChat} onRecord={() => setRecOpen(true)} onBrief={briefFlow} status={status} statusTone={statusTone} />
+            onAsk={openChat} onRecord={() => setRecOpen(true)} onBrief={briefFlow} status={status} statusTone={statusTone}
+            routines={routines} connected={serverConnected} onRoutine={setRoutineOpen} onConnect={connectFlow}
+            trips={trips} onTrip={setTripOpen} money={money} onMoney={() => setMoneyOpen(true)} />
         )}
         {tab === "memory" && (
-          <MemoryScreen loaded={graphLoaded && rememberLoaded && !!feed} memories={memories} people={graph.people} scheduled={remember.scheduled} places={remember.places}
-            onTeach={captureNote} onForget={forget} onForgetAll={forgetAll} onOpenPerson={openPerson} onReminderDone={onReminderDone} />
+          <MemoryScreen loaded={graphLoaded && rememberLoaded && !!feed} memories={memories} profile={profile} people={graph.people} scheduled={remember.scheduled} places={remember.places}
+            onTeach={captureNote} onForget={forget} onForgetFact={forgetLearned} onForgetAll={forgetAll} onOpenPerson={openPerson} onReminderDone={onReminderDone} />
         )}
         {tab === "you" && (
           <YouScreen settings={settings} onSettings={changeSettings} onUnfiltered={toggleUnfiltered} serverConnected={serverConnected}
-            onConnect={connectFlow} isPro={isPro} onUpgrade={() => setPayOpen(true)} onSignOut={signOut} />
+            onConnect={connectFlow} isPro={isPro} onUpgrade={() => setPayOpen(true)} onSignOut={signOut} onPersonalize={() => setLookOpen(true)}
+            mcp={mcp} onAddMcp={() => setMcpOpen(true)} onRemoveMcp={removeMcp} agents={agents} onPairAgent={pairAgent} onRevokeAgent={unpairAgent} onDeleteAccount={deleteAccountFlow} />
         )}
         <Toast text={toast?.text || null} action={toast?.undo ? "Undo" : undefined} onAction={undo} />
       </View>
@@ -423,6 +527,13 @@ function AuraApp({ onSignOut }: { onSignOut: () => void }) {
       <AdultSheet visible={adultOpen} busy={adultBusy} onClose={() => setAdultOpen(false)} onConfirm={confirmAdult} />
       <ScenarioSheet visible={demoOpen} onClose={() => setDemoOpen(false)} onRun={runScenario} />
       <ProSheet visible={payOpen} onClose={() => setPayOpen(false)} onSubscribe={onSubscribe} busy={payBusy} error={payErr} />
+      <RoutineSheet routine={routineOpen} onClose={() => setRoutineOpen(null)} onToggle={toggleRoutine} onRun={runRoutineNow} onEdit={editRoutine} onDelete={removeRoutine} running={routineRunning} />
+      <TripSheet trip={tripOpen} onClose={() => setTripOpen(null)} onAsk={(x) => { setTripOpen(null); setDraft(x); openChat(); }} />
+      <MoneySheet money={moneyOpen ? money : null} onClose={() => setMoneyOpen(false)} onAsk={(x) => { setMoneyOpen(false); if (x.endsWith(" ")) { setDraft(x); openChat(); } else askAura(x); }} />
+      <McpSheet visible={mcpOpen} onClose={() => setMcpOpen(false)} onAdd={addMcp} />
+      <ReplySheet to={replyTo} onClose={() => setReplyTo(null)} onSend={async (b) => { const ok = replyTo ? await replyAgent(replyTo.kid, b) : false; flash(ok ? `Sent to ${replyTo?.from}.` : "That didn't send. Try again."); return ok; }} />
+      <AgentSheet pairing={pairing} onClose={() => { setPairing(null); getAgents().then(setAgents).catch(() => {}); }} />
+      {lookOpen ? <Personalize visible={lookOpen} initial={settings.look} onSave={saveLook} onClose={() => setLookOpen(false)} /> : null}
       <CaptureMoment visible={recOpen} onClose={() => setRecOpen(false)} onCaptured={() => { refresh(); loadGraph(); }} />
     </SafeAreaView>
   );
@@ -437,11 +548,14 @@ export default function Root() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [onboarding, setOnboarding] = useState(false);
   const [signupName, setSignupName] = useState<string | undefined>(undefined);
+  const [look, setLook] = useState<AuraLook>(DEFAULT_LOOK);
   useEffect(() => { loadSession().then((ok) => setAuthed(ok)).catch(() => setAuthed(false)); }, []);
-  if (!fontsLoaded || authed === null) return <Splash />;
-  if (!authed) return <AuthScreen onAuthed={(isNew, name) => { setSignupName(name); setOnboarding(isNew); setAuthed(true); }} />;
-  if (onboarding) return <Onboarding initialName={signupName} onDone={() => setOnboarding(false)} />;
-  return <AuraApp onSignOut={() => { setOnboarding(false); setAuthed(false); }} />;
+  let screen: React.ReactNode;
+  if (!fontsLoaded || authed === null) screen = <Splash />;
+  else if (!authed) screen = <AuthScreen onAuthed={(isNew, name) => { setSignupName(name); setOnboarding(isNew); setAuthed(true); }} />;
+  else if (onboarding) screen = <Onboarding initialName={signupName} onLook={setLook} onDone={() => setOnboarding(false)} />;
+  else screen = <AuraApp onLook={setLook} onSignOut={() => { setOnboarding(false); setAuthed(false); setLook(DEFAULT_LOOK); }} />;
+  return <LookProvider value={look}>{screen}</LookProvider>;
 }
 
 const s = StyleSheet.create({

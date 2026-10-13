@@ -4,23 +4,25 @@ import { Feather } from "@expo/vector-icons";
 import Mark, { MarkState, Typing } from "../components/Mark";
 import MicButton from "../components/MicButton";
 import ActionCard from "../components/ActionCard";
-import { Button, Divider, FadeIn, IconButton, Press } from "../components/ui";
+import Results from "../components/Results";
+import { Button, Divider, FadeIn, IconButton, LinkButton, Press } from "../components/ui";
 import { c, f, inputReset, layout, r, sp, t } from "../theme";
 import type { Card, Feed, Message } from "../lib/api";
 
 const INPUT_LINE_H = 22;
 const INPUT_MAX_H = 120;
 const STARTERS: { group: string; text: string }[] = [
-  { group: "Work", text: "What's on my calendar tomorrow?" },
-  { group: "Work", text: "Anything in my inbox I should deal with today?" },
-  { group: "Life", text: "Remind me to call my mom on Sunday at 6" },
-  { group: "Life", text: "Give me your honest take on quitting my job to build something" },
+  { group: "Work", text: "What's on my calendar tomorrow, and what should I prep?" },
+  { group: "Inbox", text: "Anything in my inbox I should deal with today?" },
+  { group: "Food", text: "Find a great Italian place for 4 on Friday at 8" },
+  { group: "Travel", text: "Find me flights to Lisbon for the second week of March" },
+  { group: "Money", text: "How much have I spent on eating out this month?" },
 ];
 
 // The home of the app: one conversation with Aura that never resets its memory.
-export default function AuraScreen({ feed, pending, thinking, notice, busy, draft, setDraft, onSend, onAct, onEdit, hidden, onClear, onDemo, markState, subtitle, focusKey }: {
+export default function AuraScreen({ feed, pending, thinking, notice, busy, draft, setDraft, onSend, onAsk, onReplyAgent, onAct, onEdit, hidden, onClear, onDemo, markState, subtitle, focusKey }: {
   feed: Feed | null; pending: { id: string; content: string }[]; thinking: boolean; notice: string | null; busy: boolean;
-  draft: string; setDraft: (v: string | ((p: string) => string)) => void; onSend: () => void; onAct: (c: Card, d: "approve" | "decline") => void;
+  draft: string; setDraft: (v: string | ((p: string) => string)) => void; onSend: () => void; onAsk: (text: string) => void; onReplyAgent: (to: { kid: string; from: string; question: string }) => void; onAct: (c: Card, d: "approve" | "decline") => void;
   onEdit: (c: Card) => void; hidden: Set<string>; onClear: () => void; onDemo: () => void; markState: MarkState; subtitle: string; focusKey: number;
 }) {
   const scroller = useRef<ScrollView>(null);
@@ -60,7 +62,7 @@ export default function AuraScreen({ feed, pending, thinking, notice, busy, draf
           const card = m.card_id ? cardById(m.card_id) : undefined;
           return (
             <View key={m.id}>
-              <Bubble m={m} />
+              <Bubble m={m} onAsk={onAsk} onReply={onReplyAgent} />
               {card && !hidden.has(card.id) ? <ActionCard card={card} onAct={onAct} onEdit={onEdit} busy={busy} swipe /> : null}
             </View>
           );
@@ -97,14 +99,20 @@ export default function AuraScreen({ feed, pending, thinking, notice, busy, draf
   );
 }
 
-function Bubble({ m }: { m: Message }) {
+function Bubble({ m, onAsk, onReply }: { m: Message; onAsk?: (t: string) => void; onReply?: (to: { kid: string; from: string; question: string }) => void }) {
   if (m.role === "user") {
     return <View style={s.userRow}><View style={s.userBubble}><Text style={t.body}>{m.content}</Text></View></View>;
   }
+  const att = Array.isArray(m.attachments) ? m.attachments : [];
+  const routine = att.find((a) => a.type === "routine") as { title: string } | undefined;
+  const from = att.find((a) => a.type === "agent") as { from: string; kind: string; kid: string } | undefined;
+  const label = from ? `${from.kind === "ask" ? "Question from" : "From"} ${from.from}` : routine ? routine.title : m.kind === "reminder" ? "Reminder" : m.kind === "brief" ? "Your brief" : null;
   return (
     <View style={s.auraRow}>
-      {m.kind === "reminder" ? <Text style={s.kind}>Reminder</Text> : m.kind === "brief" ? <Text style={[s.kind, { color: c.muted }]}>Your brief</Text> : null}
+      {label ? <Text style={[s.kind, (from || m.kind === "brief") && { color: c.ink2 }]}>{label}</Text> : null}
       <Text style={[t.body, m.kind === "system" && { color: c.muted }]}>{m.content}</Text>
+      {att.length && onAsk ? <Results items={att} onAsk={onAsk} /> : null}
+      {from && onReply ? <LinkButton label={`Reply to ${from.from}`} icon="corner-down-right" onPress={() => onReply({ kid: from.kid, from: from.from, question: m.content })} style={{ marginTop: 4 }} /> : null}
     </View>
   );
 }
@@ -113,7 +121,7 @@ function Empty({ onSuggest }: { onSuggest: (t: string) => void }) {
   return (
     <View style={{ paddingTop: sp.xxl }}>
       <Text style={t.title1}>What's on your mind?</Text>
-      <Text style={[t.callout, { marginTop: sp.s }]}>Work, life, anything. Aura remembers what you tell it and gets things done in the apps you connect.</Text>
+      <Text style={[t.callout, { marginTop: sp.s }]}>Work, life, anything. Aura remembers what you tell it, searches the web, books, plans and keeps track, with your OK on anything that leaves your world.</Text>
       <View style={s.starters}>
         {STARTERS.map((x, i) => (
           <View key={x.text}>
@@ -140,7 +148,7 @@ const s = StyleSheet.create({
   thinking: { paddingVertical: 8, marginBottom: sp.l },
   starters: { marginTop: sp.xxl, borderTopWidth: 1, borderTopColor: c.ink },
   starter: { flexDirection: "row", alignItems: "baseline", gap: sp.l, paddingVertical: 15 },
-  group: { width: 40, fontFamily: f.medium, fontSize: 13, color: c.muted },
+  group: { width: 52, fontFamily: f.medium, fontSize: 13, color: c.muted },
   composer: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 },
   shell: { flexDirection: "row", alignItems: "center", gap: 2, backgroundColor: c.surface, borderRadius: r.md, borderWidth: 1, borderColor: c.control, paddingLeft: 14, paddingRight: 6, paddingVertical: 6 },
   shellFocus: { borderColor: c.ink },

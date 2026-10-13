@@ -1,4 +1,4 @@
-// Per-user assistant settings: Aura's personality, unfiltered mode, and custom instructions.
+// Per-user assistant settings: Aura's personality and look, unfiltered mode, and custom instructions.
 // Unfiltered can only be switched on after the user confirms they are 18 or older; the
 // confirmation time is stored. Also lets the user delete a memory. JWT-secured; filters by ctx.user.id.
 
@@ -6,7 +6,15 @@ function json(d: any, s = 200): Response {
   return new Response(JSON.stringify(d), { status: s, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
 }
 
-export const PERSONALITIES = ["witty", "warm", "blunt", "chill"] as const;
+const PERSONALITIES = ["witty", "warm", "blunt", "chill"];
+// Aura's look, as the app's Personalize screen sets it. Stored as given after a shape check.
+const LOOK_KEYS: Record<string, RegExp> = { color: /^[a-z]{2,12}$/, texture: /^[a-z]{2,12}$/, expression: /^[a-z]{2,12}$/, accessory: /^[a-z]{2,12}$/, backdrop: /^[a-z]{2,12}$/ };
+function cleanLook(x: any): any {
+  if (!x || typeof x !== "object") return null;
+  const out: any = {};
+  for (const k of Object.keys(LOOK_KEYS)) if (typeof x[k] === "string" && LOOK_KEYS[k].test(x[k])) out[k] = x[k];
+  return Object.keys(out).length ? out : null;
+}
 
 async function ensure(ctx: any) {
   await ctx.db.query(`CREATE TABLE IF NOT EXISTS user_settings (
@@ -17,16 +25,18 @@ async function ensure(ctx: any) {
     instructions text,
     updated_at timestamptz DEFAULT now()
   )`);
+  await ctx.db.query("ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS look jsonb");
 }
 
 async function read(ctx: any, userId: string) {
-  const r = await ctx.db.query("SELECT personality, unfiltered, adult_ack_at, instructions FROM user_settings WHERE user_id=$1", [userId]);
+  const r = await ctx.db.query("SELECT personality, unfiltered, adult_ack_at, instructions, look FROM user_settings WHERE user_id=$1", [userId]);
   const row = r.rows[0] || {};
   return {
     personality: PERSONALITIES.includes(row.personality) ? row.personality : "witty",
     unfiltered: !!row.unfiltered,
     adult_confirmed: !!row.adult_ack_at,
     instructions: row.instructions || "",
+    look: row.look || null,
     unfiltered_available: !!(ctx.env.UNBLOCK_API_KEY && ctx.env.UNBLOCK_MODEL),
   };
 }
@@ -58,6 +68,10 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
            instructions=$5, updated_at=now()`,
         [userId, personality, unfiltered, confirmAdult, instructions],
       );
+      if (body.look !== undefined) {
+        const look = cleanLook(body.look);
+        if (look) await ctx.db.query("UPDATE user_settings SET look=$2, updated_at=now() WHERE user_id=$1", [userId, JSON.stringify(look)]);
+      }
       return json({ ok: true, settings: await read(ctx, userId) });
     }
 
@@ -70,7 +84,20 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
 
     if (op === "forget_all") {
       const r = await ctx.db.query("DELETE FROM memories WHERE user_id=$1 AND kind IS DISTINCT FROM 'task' RETURNING id", [userId]);
+      // the memory graph too (memory.ts), when it exists
+      await ctx.db.query("UPDATE mem_edges SET status='forgotten', valid_to=now() WHERE user_id=$1 AND status='live'", [userId]).catch(() => {});
+      await ctx.db.query("DELETE FROM mem_chunks WHERE user_id=$1", [userId]).catch(() => {});
       return json({ ok: true, deleted: r.rows.length });
+    }
+
+    if (op === "delete_account") {
+      // erase everything Aura holds for this person; the app signs them out afterwards
+      if (body.confirm !== "delete") return json({ error: "confirmation required" }, 400);
+      const tables = ["messages", "memories", "cards", "actions", "connections", "context_state", "devices", "mem_chunks", "mem_edges", "mem_nodes", "mem_contradictions",
+        "expenses", "budgets", "trips", "routines", "mcp_servers", "a2a_codes", "a2a_agents", "a2a_consents", "a2a_messages", "a2a_receipts", "entitlements", "user_settings"];
+      for (const t of tables) await ctx.db.query(`DELETE FROM ${t} WHERE user_id=$1`, [userId]).catch(() => {});
+      await ctx.db.query("DELETE FROM profiles WHERE id=$1", [userId]).catch(() => {});
+      return json({ ok: true });
     }
 
     return json({ error: "unknown op" }, 400);

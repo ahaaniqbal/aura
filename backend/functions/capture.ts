@@ -80,6 +80,7 @@ return STRICT json only, all lowercase, no em dashes:
  "reminders":[{"text":str,"when":"YYYY-MM-DD or null","place":"a named venue or null"}],
  "care":[{"person":str,"note":str}],
  "self":{"valence":int,"mood":str,"note":str},
+ "notes":${quick ? "null" : '{"title":str,"summary":str,"decisions":[str],"action_items":[{"text":str,"owner":"me" or a name}]} or null'},
  "summary":str
 }
 notes:
@@ -87,7 +88,8 @@ notes:
 - "promises" are commitments to OTHER people, not tasks for yourself.
 - "wants" is gift and preference memory for a person. "care" is the emotional weight for other people (stress, grief, big changes), not neutral facts. "self" is the USER'S OWN state, only if evident (valence -2 rough..2 great, null if not).
 - "summary" is one warm sentence to the user, what you caught and what you'll do with it, in aura's voice.
-- if nothing relevant, use empty arrays and a short honest summary.`;
+- if nothing relevant, use empty arrays and a short honest summary.${quick ? "" : `
+- "notes" is for a meeting or a real conversation: a short title, two or three sentences on what was discussed, what was decided, and the action items with who owns each. null if it was just a passing moment.`}`;
 
     const out = await ai(API, APP, KEY, [{ role: "system", content: SYSTEM }, { role: "user", content: prompt }]);
     const parsed = parseJSON(out) || { people: [], promises: [], reminders: [], care: [], summary: "i listened, but nothing in there needs tracking right now." };
@@ -149,9 +151,25 @@ notes:
     }
 
     const summary = (parsed.summary || "").toString().trim() || "got it, i've remembered that.";
-    const m = await ctx.db.query("INSERT INTO messages (user_id, role, content, kind) VALUES ($1,'aura',$2,'capture') RETURNING *", [userId, summary]);
 
-    return json({ ok: true, people: people.length, promises: promises.length, care: care.length, reminders: scheduled, chips, summary, graph: g, message: m.rows[0] });
+    // meeting notes: kept as a memory, my action items become tasks, and the whole transcript goes
+    // into the memory graph (memory.ts) so Aura can recall what was said later
+    const n = !quick && parsed.notes && typeof parsed.notes === "object" ? parsed.notes : null;
+    let notes: any = null;
+    if (n && (n.summary || (n.action_items || []).length)) {
+      notes = { type: "notes", title: String(n.title || "Meeting notes").slice(0, 80), summary: String(n.summary || "").slice(0, 800),
+        decisions: (Array.isArray(n.decisions) ? n.decisions : []).map(String).slice(0, 8), action_items: (Array.isArray(n.action_items) ? n.action_items : []).slice(0, 10).map((a: any) => ({ text: String(a?.text || a || ""), owner: String(a?.owner || "me") })) };
+      await ctx.db.query("INSERT INTO memories (user_id, text, kind, source) VALUES ($1,$2,'meeting','capture')", [userId, `${notes.title}: ${notes.summary}`]);
+      for (const a of notes.action_items) if (a.text && /^(me|i|you)$/i.test(a.owner)) await ctx.db.query("INSERT INTO memories (user_id, text, kind, source) VALUES ($1,$2,'task','capture')", [userId, a.text]);
+    }
+    if (!quick) {
+      const bg = fetch(`${API}/v1/${APP}/fn/memory`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: authHeader }, body: JSON.stringify({ op: "ingest", text: text.slice(0, 8000), source: "recording" }) }).catch(() => {});
+      if (ctx.waitUntil) ctx.waitUntil(bg);
+    }
+    await ctx.db.query("ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachments jsonb").catch(() => {});
+    const m = await ctx.db.query("INSERT INTO messages (user_id, role, content, kind, attachments) VALUES ($1,'aura',$2,'capture',$3) RETURNING *", [userId, summary, notes ? JSON.stringify([notes]) : null]);
+
+    return json({ ok: true, people: people.length, promises: promises.length, care: care.length, reminders: scheduled, chips, summary, notes, graph: g, message: m.rows[0] });
   } catch (e: any) {
     console.error("capture error:", String(e));
     return json({ error: String(e) }, 500);

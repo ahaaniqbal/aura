@@ -20,7 +20,6 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
   if (req.method === "OPTIONS") return json({ ok: true });
   try {
     const body = await req.json().catch(() => ({}));
-    const userId = body.user_id || "demo";
     const actionId = body.action_id;
     const decision = body.decision || "approve";
     if (!actionId) return json({ error: "action_id required" }, 400);
@@ -30,6 +29,14 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
     const ares = await ctx.db.query("SELECT * FROM actions WHERE id=$1", [actionId]);
     if (!ares.rows.length) return json({ error: "action not found" }, 404);
     const action = ares.rows[0];
+    // only the person the action belongs to can decide it (legacy clients without a JWT still send user_id)
+    if (ctx.user?.id && action.user_id !== ctx.user.id) return json({ error: "not yours" }, 403);
+    const userId = ctx.user?.id || action.user_id || body.user_id;
+    const IK = ctx.env.AURA_INTERNAL_KEY || "";
+    const internal = async (fn: string, payload: any) => {
+      const r = await fetch(`${BUTTERBASE_API_URL}/v1/${BUTTERBASE_APP_ID}/fn/${fn}`, { method: "POST", headers: { "Content-Type": "application/json", "x-aura-internal": IK }, body: JSON.stringify({ ...payload, user_id: userId }) });
+      return r.json().catch(() => ({}));
+    };
     const payload = action.payload || {};
 
     if (decision === "decline") {
@@ -71,6 +78,49 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
       result = result || { confirmation: rid("BK-"), detail: action.title };
       confirm = `booked. confirmation ${result.confirmation}, all set.`;
       memo = `booked: ${action.title}.`;
+    } else if (action.kind === "reservation") {
+      // no universal booking api for restaurants: open the booking page for them and hold the time
+      const when = String(payload.when || "");
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(when)) {
+        const tzr = await ctx.db.query("SELECT timezone FROM context_state WHERE user_id=$1", [userId]).catch(() => ({ rows: [] }));
+        await exec(BUTTERBASE_API_URL, BUTTERBASE_APP_ID, BUTTERBASE_API_KEY, "GOOGLECALENDAR_CREATE_EVENT", { summary: `Dinner at ${payload.place}`, start_datetime: when.slice(0, 16) + ":00", event_duration_hour: 2, event_duration_minutes: 0, timezone: tzr.rows[0]?.timezone || "UTC", description: `Table for ${payload.party}. ${payload.notes || ""} ${payload.link || ""}`.trim() }, userId).catch(() => null);
+      }
+      result = { open_url: payload.link || null, phone: payload.phone || null, place: payload.place, when, party: payload.party };
+      confirm = `opening ${payload.place} so you can lock in the table for ${payload.party}. it's on your calendar.`;
+      memo = `planned dinner at ${payload.place} (${when.slice(0, 10)}, ${payload.party} people).`;
+    } else if (action.kind === "flight_book") {
+      const r = await internal("travel", { op: "book_flight", offer_id: payload.offer_id });
+      if (!r?.booking_reference) {
+        const fm = await ctx.db.query("INSERT INTO messages (user_id, role, content, kind) VALUES ($1,'aura',$2,'chat') RETURNING *", [userId, r?.error === "traveler_incomplete" ? `i need your traveler details first: ${(r.missing || []).join(", ")}.` : `couldn't book that one: ${r?.error || "the fare may have expired"}. want me to search again?`]);
+        return json({ ok: false, error: r?.error || "book_failed", message: fm.rows[0] });
+      }
+      result = r;
+      confirm = `booked. confirmation ${r.booking_reference}, ${r.total} ${r.currency}${r.live ? "" : " (test booking)"}.`;
+      memo = `booked flight ${payload.summary || ""}, confirmation ${r.booking_reference}.`;
+    } else if (action.kind === "event_create") {
+      const r = await exec(BUTTERBASE_API_URL, BUTTERBASE_APP_ID, BUTTERBASE_API_KEY, "GOOGLECALENDAR_CREATE_EVENT", payload, userId);
+      if (!(r?.successful || r?.data)) {
+        const fm = await ctx.db.query("INSERT INTO messages (user_id, role, content, kind) VALUES ($1,'aura',$2,'chat') RETURNING *", [userId, "couldn't send that invite. is your calendar connected?"]);
+        return json({ ok: false, error: "event_failed", message: fm.rows[0] });
+      }
+      result = { created: true };
+      confirm = `invite sent for ${payload.summary}.`;
+      memo = `scheduled ${payload.summary} with ${(payload.attendees || []).join(", ")}.`;
+    } else if (action.kind === "mcp_call") {
+      const r = await internal("mcp", { op: "call", server: payload.server, tool: payload.tool, args: payload.args || {}, approved: true });
+      result = r;
+      confirm = r?.ok ? `done in ${r.server}.${r.content ? " " + String(r.content).slice(0, 200) : ""}` : `that didn't go through: ${r?.error || "unknown error"}.`;
+      memo = r?.ok ? `ran ${payload.tool} in ${r.server}.` : "";
+    } else if (action.kind === "a2a_consent") {
+      const hours = Math.max(1, Math.min(8, Number(payload.hours) || 8));
+      await ctx.db.query("INSERT INTO a2a_consents (user_id, kid, scope, expires_at) VALUES ($1,$2,$3, now() + make_interval(hours => $4))", [userId, payload.kid, payload.scope || "recall", hours]);
+      result = { granted: payload.scope || "recall", hours };
+      confirm = `ok, ${payload.label} can read your memory for the next ${hours} hour${hours === 1 ? "" : "s"}.`;
+    } else if (action.kind === "a2a_act") {
+      const r = await internal("agent", { text: payload.intent, source: "a2a" });
+      result = { reply: r?.reply || null };
+      await ctx.db.query("INSERT INTO a2a_messages (user_id, kid, direction, kind, body) VALUES ($1,$2,'out','result',$3)", [userId, payload.kid, String(r?.reply || "done").slice(0, 2000)]).catch(() => {});
+      confirm = r?.reply ? "" : "done.";
     } else {
       result = result || { ok: true };
       confirm = "done.";
@@ -78,12 +128,12 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
     }
 
     await ctx.db.query("UPDATE actions SET state='executed', result=$2, updated_at=now() WHERE id=$1", [actionId, JSON.stringify(result)]);
-    const cardRes = await ctx.db.query("UPDATE cards SET status='done', body=$2, updated_at=now() WHERE action_id=$1 RETURNING *", [actionId, confirm]);
+    const cardRes = await ctx.db.query("UPDATE cards SET status='done', body=$2, updated_at=now() WHERE action_id=$1 RETURNING *", [actionId, confirm || "done."]);
     if (memo) {
       await ctx.db.query("INSERT INTO memories (user_id, text, source) VALUES ($1,$2,'derived')", [userId, memo]);
       if (HYDRA_DB_API_KEY) { const bg = hydraIngest(HYDRA_BASE, HYDRA_DB_API_KEY, userId, memo); if (ctx.waitUntil) ctx.waitUntil(bg); else bg.catch(() => {}); }
     }
-    const m = await ctx.db.query("INSERT INTO messages (user_id, role, content, kind) VALUES ($1,'aura',$2,'chat') RETURNING *", [userId, confirm]);
+    const m = confirm ? await ctx.db.query("INSERT INTO messages (user_id, role, content, kind) VALUES ($1,'aura',$2,'chat') RETURNING *", [userId, confirm]) : { rows: [null] };
     return json({ ok: true, decision, result, confirm, card: cardRes.rows[0], message: m.rows[0] });
   } catch (e: any) {
     console.error("approve error:", String(e), e?.stack);

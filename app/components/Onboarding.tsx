@@ -2,17 +2,20 @@ import React, { useEffect, useRef, useState } from "react";
 import { Animated, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
-import Mark, { Wordmark } from "./Mark";
+import Mark from "./Mark";
 import MicButton from "./MicButton";
 import { Button, Divider, EASE_OUT, IconButton, Press } from "./ui";
 import { c, f, inputReset, r, sp, t } from "../theme";
 import { addNote, agent, getFeed, Personality, saveSettings } from "../lib/api";
+import { AuraLook, DEFAULT_LOOK } from "../lib/faces";
+import Personalize from "./Personalize";
 import { PERSONALITIES } from "../lib/personality";
 
-// First run. Opens and closes on vermilion, Aura's own color; the questions in between are plain
-// so the typing is the focus. The payoff is Aura showing back what it already knows about you.
-export default function Onboarding({ onDone, initialName }: { onDone: () => void; initialName?: string }) {
+// First run. You dress Aura up first (it's yours), then tell it your name, how it should talk and
+// what's on your plate. It closes on vermilion with Aura showing back what it already knows.
+export default function Onboarding({ onDone, initialName, onLook }: { onDone: () => void; initialName?: string; onLook?: (l: AuraLook) => void }) {
   const [step, setStep] = useState(0);
+  const [look, setLook] = useState<AuraLook>(DEFAULT_LOOK);
   const [name, setName] = useState(initialName || "");
   const [personality, setPersonality] = useState<Personality>("witty");
   const [seed, setSeed] = useState("");
@@ -26,7 +29,7 @@ export default function Onboarding({ onDone, initialName }: { onDone: () => void
   }, [step]);
 
   const go = (n: number) => { Haptics.selectionAsync().catch(() => {}); setStep(n); };
-  const start = () => go(initialName ? 2 : 1);
+  const saveLook = (l: AuraLook) => { setLook(l); onLook?.(l); saveSettings({ look: l }).catch(() => {}); go(initialName ? 2 : 1); };
   const saveName = () => { const n = name.trim(); if (n) addNote(`my name is ${n}`).catch(() => {}); go(2); };
   const savePersonality = () => { saveSettings({ personality }).catch(() => {}); go(3); };
   const captureSeed = async () => {
@@ -42,14 +45,14 @@ export default function Onboarding({ onDone, initialName }: { onDone: () => void
   };
   const finish = () => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); onDone(); };
   const firstName = name.trim().split(" ")[0];
-  const brand = step === 0 || step === 5;
-  const qSteps = initialName ? [2, 3] : [1, 2, 3];
+  const brand = step === 5;
+  const qSteps = initialName ? [0, 2, 3] : [0, 1, 2, 3];
   const qIndex = qSteps.indexOf(step);
 
   return (
     <SafeAreaView style={[s.root, brand && { backgroundColor: c.accent }]}>
       <StatusBar style="dark" />
-      {qIndex >= 0 ? (
+      {qIndex > 0 ? (
         <View style={s.nav}>
           <IconButton icon="chevron-left" size={36} variant="plain" onPress={() => go(qIndex === 0 ? 0 : qSteps[qIndex - 1])} label="Back" />
           <Text style={t.caption}>{qIndex + 1} of {qSteps.length}</Text>
@@ -60,14 +63,13 @@ export default function Onboarding({ onDone, initialName }: { onDone: () => void
         <Animated.View style={[s.fill, { opacity: fade }]}>
 
           {step === 0 && (
-            <View style={s.page}>
-              <View style={{ paddingTop: sp.l }}><Wordmark /></View>
-              <View style={{ flex: 1, justifyContent: "flex-end", paddingBottom: sp.h }}>
-                <Preview />
-                <Text style={[t.display, { marginTop: sp.h }]}>One AI for your work and your life.</Text>
-                <Text style={[t.callout, { color: c.onAccentMuted, marginTop: sp.m }]}>It remembers what you tell it, keeps an eye on your inbox and calendar, and handles the rest with your OK.</Text>
+            <View style={s.fill}>
+              <View style={s.lookHead}>
+                <Text style={t.caption}>1 of {qSteps.length}</Text>
+                <Text style={[t.title1, { marginTop: sp.s }]}>Make Aura yours</Text>
+                <Text style={[t.callout, { marginTop: sp.xs }]}>Pick a look. You can change it anytime.</Text>
               </View>
-              <Button label="Get started" onPress={start} />
+              <Personalize inline initial={look} onSave={saveLook} saveLabel="Continue" />
             </View>
           )}
 
@@ -131,7 +133,7 @@ export default function Onboarding({ onDone, initialName }: { onDone: () => void
 
           {step === 4 && (
             <View style={[s.page, { justifyContent: "center" }]}>
-              <Mark size={44} state="thinking" />
+              <Mark size={72} state="thinking" />
               <Text style={[t.title1, { marginTop: sp.l }]}>Getting to know you</Text>
               <Text style={[t.callout, { marginTop: 6 }]}>Picking out what's worth remembering.</Text>
             </View>
@@ -140,6 +142,7 @@ export default function Onboarding({ onDone, initialName }: { onDone: () => void
           {step === 5 && (
             <ScrollView contentContainerStyle={s.scrollPage}>
               <View style={{ flex: 1, justifyContent: "center", paddingVertical: sp.h }}>
+                <Mark size={96} style={{ marginBottom: sp.l }} />
                 <Text style={t.display}>{firstName ? `Aura's ready, ${firstName}.` : "Aura's ready."}</Text>
                 {known.length ? (
                   <>
@@ -164,19 +167,6 @@ export default function Onboarding({ onDone, initialName }: { onDone: () => void
   );
 }
 
-// A real slice of the product: one question, one answer that covers work and life.
-function Preview() {
-  return (
-    <View style={s.preview}>
-      <View style={s.pUser}><Text style={t.body}>anything i'm forgetting today?</Text></View>
-      <View style={s.pAura}>
-        <Mark size={22} />
-        <Text style={[t.body, { flex: 1 }]}>your 2pm moved to 3. dana needs a yes on the venue by 5, i drafted it. and it's mike's birthday tomorrow, he's been eyeing an espresso grinder.</Text>
-      </View>
-    </View>
-  );
-}
-
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: c.canvas },
   fill: { flex: 1 },
@@ -193,9 +183,7 @@ const s = StyleSheet.create({
   letter: { backgroundColor: c.surface, borderRadius: r.md, borderWidth: 1, borderColor: c.control, padding: sp.l, marginTop: sp.xxl },
   letterInput: { fontFamily: f.regular, fontSize: 17, lineHeight: 25, color: c.ink, minHeight: 150, padding: 0 },
   letterFoot: { flexDirection: "row", alignItems: "center", marginTop: sp.m, paddingTop: sp.m, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
-  preview: { backgroundColor: c.surface, borderRadius: r.md, padding: sp.l, gap: sp.m },
-  pUser: { alignSelf: "flex-end", maxWidth: "86%", backgroundColor: c.sunken, borderRadius: r.md, paddingHorizontal: 14, paddingVertical: 10 },
-  pAura: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  lookHead: { paddingHorizontal: 24, paddingTop: sp.l },
   known: { marginTop: sp.s, borderTopWidth: 1, borderTopColor: c.ink },
   knownItem: { paddingVertical: 11 },
   knownSep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(13,14,18,0.25)" },

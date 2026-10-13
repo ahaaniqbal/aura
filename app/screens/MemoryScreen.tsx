@@ -8,7 +8,7 @@ import { Divider, Empty, FadeIn, IconButton, LinkButton, Press, Tabs } from "../
 import { c, f, inputReset, layout, r, sp, t, toneColor } from "../theme";
 import { contactStats, closeness, isDrifting } from "../lib/weight";
 import { capitalize, daysUntilBirthday, inDays, reminderWhen } from "../lib/dates";
-import type { CaptureResult, GraphPerson, Memory, PlaceReminder, Reminder } from "../lib/api";
+import type { ProfileGroup, CaptureResult, GraphPerson, Memory, PlaceReminder, Reminder } from "../lib/api";
 
 type Seg = "you" | "people" | "reminders";
 const BUCKETS: { key: string; label: string }[] = [
@@ -16,9 +16,9 @@ const BUCKETS: { key: string; label: string }[] = [
 ];
 
 // Everything Aura knows, in the open. Teach it something, see what it kept, and forget anything.
-export default function MemoryScreen({ loaded, memories, people, scheduled, places, onTeach, onForget, onForgetAll, onOpenPerson, onReminderDone }: {
-  loaded: boolean; memories: Memory[]; people: GraphPerson[]; scheduled: Reminder[]; places: PlaceReminder[];
-  onTeach: (t: string) => Promise<CaptureResult>; onForget: (m: Memory) => void; onForgetAll: () => void;
+export default function MemoryScreen({ loaded, memories, profile, people, scheduled, places, onTeach, onForget, onForgetFact, onForgetAll, onOpenPerson, onReminderDone }: {
+  loaded: boolean; memories: Memory[]; profile: ProfileGroup[]; people: GraphPerson[]; scheduled: Reminder[]; places: PlaceReminder[];
+  onTeach: (t: string) => Promise<CaptureResult>; onForget: (m: Memory) => void; onForgetFact: (id: string, text: string) => void; onForgetAll: () => void;
   onOpenPerson: (name: string) => void; onReminderDone: (id: string) => void;
 }) {
   const [seg, setSeg] = useState<Seg>("you");
@@ -32,6 +32,8 @@ export default function MemoryScreen({ loaded, memories, people, scheduled, plac
   const facts = memories.filter((m) => m.kind !== "task");
   const tasks = memories.filter((m) => m.kind === "task");
   const reminderCount = scheduled.length + places.length + tasks.length;
+  const groups = profile.filter((g) => g.key !== "people" && g.items.length);
+  const known = groups.reduce((a, g) => a + g.items.length, 0);
 
   const submit = async () => {
     const text = d.trim(); if (!text || sending) return;
@@ -73,7 +75,7 @@ export default function MemoryScreen({ loaded, memories, people, scheduled, plac
         ) : null}
 
         <Tabs style={{ marginTop: sp.h }} value={seg} onChange={setSeg} options={[
-          { key: "you", label: "About you", count: facts.length },
+          { key: "you", label: "About you", count: facts.length + known },
           { key: "people", label: "People", count: people.length },
           { key: "reminders", label: "Reminders", count: reminderCount },
         ]} />
@@ -81,8 +83,26 @@ export default function MemoryScreen({ loaded, memories, people, scheduled, plac
         {!loaded ? <Text style={[t.callout, { paddingVertical: sp.xl }]}>Loading what Aura knows…</Text> : null}
 
         {loaded && seg === "you" ? (
-          facts.length ? (
+          facts.length || known ? (
             <>
+              {groups.map((g) => (
+                <View key={g.key}>
+                  <Text style={s.group}>{g.label}</Text>
+                  {g.items.map((it, i) => (
+                    <View key={it.id}>
+                      {i > 0 ? <Divider /> : null}
+                      <View style={s.fact}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={t.body}>{it.target || it.text}</Text>
+                          {factCaption(it) ? <Text style={[t.footnote, { marginTop: 2 }]}>{factCaption(it)}</Text> : null}
+                        </View>
+                        <IconButton icon="x" variant="plain" size={30} color={c.muted} onPress={() => onForgetFact(it.id, it.text)} label={`Forget: ${it.text}`} />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ))}
+              {facts.length ? <Text style={s.group}>{groups.length ? "Notes" : "What you've told Aura"}</Text> : null}
               {facts.map((m, i) => (
                 <View key={m.id}>
                   {i > 0 ? <Divider /> : null}
@@ -94,7 +114,7 @@ export default function MemoryScreen({ loaded, memories, people, scheduled, plac
               ))}
               <LinkButton label="Forget everything" icon="trash-2" color={c.ink2} onPress={onForgetAll} style={{ marginTop: sp.l }} />
             </>
-          ) : <Empty title="Nothing yet" body="Tell Aura about your work, your routines, what you like. Everything it keeps shows up here, and you can remove any of it." />
+          ) : <Empty title="Nothing yet" body="Tell Aura about your work, your routines, what you like and don't. Everything it keeps shows up here, and you can remove any of it." />
         ) : null}
 
         {loaded && seg === "people" ? <PeopleList people={people} q={q} setQ={setQ} onOpen={onOpenPerson} /> : null}
@@ -160,6 +180,13 @@ function Item({ when, text, onDone }: { when: string; text: string; onDone: () =
   );
 }
 
+// What a learned fact is, in a word or two, under its subject: "Lumen" / "Work, head of product".
+const REL_CAPTION: Record<string, string> = { WORKS_FOR: "Work", WORKS_ON: "Project", LIVES_IN: "Home", BORN_ON: "Your birthday", PURSUES: "Goal", FOLLOWS: "Habit", VISITED: "Been there", PLANS_TO_VISIT: "Wants to go", KNOWS: "Knows" };
+function factCaption(it: ProfileGroup["items"][number]): string {
+  const base = it.relation && REL_CAPTION[it.relation] ? REL_CAPTION[it.relation] : "";
+  return capitalize([base, it.detail, it.context].filter(Boolean).join(", "));
+}
+
 function PeopleList({ people, q, setQ, onOpen }: { people: GraphPerson[]; q: string; setQ: (v: string) => void; onOpen: (name: string) => void }) {
   const rows = useMemo(() => people.map((p) => {
     const b = daysUntilBirthday(p.birthday);
@@ -168,7 +195,7 @@ function PeopleList({ people, q, setQ, onOpen }: { people: GraphPerson[]; q: str
     const label = care ? "On their mind" : b !== null && b <= 14 ? `Birthday ${inDays(b).toLowerCase()}` : p.open_promises?.length ? "You owe them" : isDrifting(p) ? "It's been a while" : null;
     const signal = care || (b !== null && b <= 3);
     const line = capitalize([p.relation, p.org, st.lastLabel ? `last spoke ${st.lastLabel}` : null].filter(Boolean).join(" · ")) || "Someone you know";
-    return { p, label, signal, line, cl: closeness(p) };
+    return { p, label, signal, line, party: b !== null && b <= 14, cl: closeness(p) };
   }).sort((a, b) => Number(!!b.label) - Number(!!a.label) || b.cl - a.cl), [people]);
   const query = q.trim().toLowerCase();
   const shown = rows.filter((x) => !query || [x.p.person, x.p.relation, x.p.org].some((v) => (v || "").toLowerCase().includes(query)));
@@ -185,7 +212,7 @@ function PeopleList({ people, q, setQ, onOpen }: { people: GraphPerson[]; q: str
         <View key={x.p.person}>
           {i > 0 ? <Divider inset={60} /> : null}
           <Press onPress={() => onOpen(x.p.person)} style={s.person} scaleTo={0.99} accessibilityLabel={`${x.p.person}${x.label ? `, ${x.label}` : ""}`}>
-            <Avatar name={x.p.person} size={44} signal={x.signal} />
+            <Avatar name={x.p.person} size={44} signal={x.signal} party={x.party} />
             <View style={{ flex: 1 }}>
               <Text style={t.headline} numberOfLines={1}>{x.p.person}</Text>
               <Text style={[t.footnote, { marginTop: 2 }]} numberOfLines={1}>{x.line}</Text>

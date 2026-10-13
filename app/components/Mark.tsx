@@ -1,25 +1,36 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useId, useMemo, useRef } from "react";
 import { Animated, Easing, Text, View } from "react-native";
+import { SvgXml } from "react-native-svg";
 import { c, f } from "../theme";
+import { AuraLook, auraSvg } from "../lib/faces";
+import { useLook } from "./look";
 
 export type MarkState = "idle" | "thinking";
 
-// Aura's mark is a single vermilion dot: the light that's on when Aura is with you. It holds
-// still at rest and pulses only while Aura is working. The app icon is the same dot on ink.
-export default function Mark({ size = 28, state = "idle", ink, style }: { size?: number; state?: MarkState; ink?: boolean; style?: any }) {
-  const a = useRef(new Animated.Value(1)).current;
+// Aura's mark is Aura itself: a small sun with a face, dressed however you chose. It holds still
+// at rest and bobs while Aura is working. `look` overrides the saved look (previews, pickers).
+export default function Mark({ size = 28, state = "idle", look, backdrop, style }: { size?: number; state?: MarkState; look?: Partial<AuraLook>; backdrop?: boolean; style?: any }) {
+  const saved = useLook();
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
+  const l = look || saved;
+  const xml = useMemo(() => auraSvg(l, uid, { backdrop }), [JSON.stringify(l), uid, backdrop]);
+  const a = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (state !== "thinking") { a.setValue(1); return; }
+    if (state !== "thinking") { a.setValue(0); return; }
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(a, { toValue: 0.4, duration: 560, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      Animated.timing(a, { toValue: 1, duration: 560, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      Animated.timing(a, { toValue: 1, duration: 420, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(a, { toValue: 0, duration: 420, easing: Easing.in(Easing.quad), useNativeDriver: true }),
     ]));
     loop.start();
     return () => loop.stop();
   }, [state]);
+  const lift = a.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.08] });
+  const squash = a.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
   return (
-    <View accessibilityLabel={state === "thinking" ? "Aura is working" : "Aura"} style={[{ width: size, height: size, alignItems: "center", justifyContent: "center" }, style]}>
-      <Animated.View style={{ width: size * 0.62, height: size * 0.62, borderRadius: size, backgroundColor: ink ? c.ink : c.accent, opacity: a, transform: [{ scale: a.interpolate({ inputRange: [0.4, 1], outputRange: [0.86, 1] }) }] }} />
+    <View accessibilityLabel={state === "thinking" ? "Aura is working" : "Aura"} style={[{ width: size, height: size }, style]}>
+      <Animated.View style={{ width: size, height: size, transform: [{ translateY: lift }, { scaleY: squash }] }}>
+        <SvgXml xml={xml} width={size} height={size} />
+      </Animated.View>
     </View>
   );
 }

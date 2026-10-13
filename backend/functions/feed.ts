@@ -5,7 +5,8 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
   if (req.method === "OPTIONS") return json({ ok: true });
   try {
     const url = new URL(req.url);
-    const userId = url.searchParams.get("user_id") || "demo";
+    // the signed-in user; the query param is only for older clients without a JWT
+    const userId = ctx.user?.id || url.searchParams.get("user_id") || "demo";
     const msgs = await ctx.db.query("SELECT * FROM messages WHERE user_id=$1 ORDER BY created_at DESC LIMIT 60", [userId]);
     const cards = await ctx.db.query("SELECT * FROM cards WHERE user_id=$1 ORDER BY created_at DESC LIMIT 30", [userId]);
     const mem = await ctx.db.query("SELECT id, text, kind, source, created_at FROM memories WHERE user_id=$1 ORDER BY created_at DESC LIMIT 60", [userId]);

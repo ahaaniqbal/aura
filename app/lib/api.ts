@@ -1,6 +1,7 @@
 // Aura backend client. Every request carries the user's JWT; the backend derives the
 // user from the token (ctx.user.id) and enforces per-user RLS. No hardcoded user.
 import * as SecureStore from "expo-secure-store";
+import { AuraLook, DEFAULT_LOOK, normalizeLook } from "./faces";
 
 const APP = "app_6nromeez40uq";
 export const API = `https://api.butterbase.ai/v1/${APP}/fn`;
@@ -20,12 +21,30 @@ export type Card = {
 
 export type Message = {
   id: string;
-  role: "user" | "aura" | "system";
+  role: "user" | "aura" | "system" | "agent";
   content: string;
   kind: string;
   card_id: string | null;
   created_at: string;
+  attachments?: Attachment[] | null;
 };
+
+// Rich results the agent attaches to a reply: what it found, shown as UI instead of a wall of text.
+export type Place = { id: string; name: string; address: string; kind: string; rating: number | null; reviews: number | null; price: string | null; open_now: boolean | null; phone: string; website: string | null; maps_url: string | null; summary: string | null; links: { label: string; url: string }[] };
+export type FlightSlice = { from: string; to: string; depart: string; arrive: string; minutes: number; stops: number; flights: string[] };
+export type FlightOffer = { id: string; total: string; currency: string; airline: string; airline_code: string; expires_at: string; slices: FlightSlice[] };
+export type TripDay = { date?: string; title?: string; items?: { time?: string; text: string }[] };
+export type Trip = { id: string; title: string; destination: string | null; start_date: string | null; end_date: string | null; summary: string | null; plan: TripDay[]; bookings?: any[]; status?: string };
+export type MoneySummary = { month: string; total: number; last_month: number; categories: { category: string; spent: number; count: number; budget: number | null }[]; top_merchants: { merchant: string; spent: number }[]; recurring: { merchant: string; amount: number; months: number; last: string }[] };
+export type Attachment =
+  | { type: "places"; query: string; near: string | null; party: number | null; when: string | null; items: Place[] }
+  | { type: "flights"; from: string; to: string; depart: string; return: string | null; offers: FlightOffer[]; search_url: string }
+  | { type: "links"; query: string; items: { title: string; url: string; source: string; snippet: string }[] }
+  | { type: "trip"; trip: Trip }
+  | { type: "money"; summary: MoneySummary }
+  | { type: "notes"; title: string; summary: string; decisions: string[]; action_items: { text: string; owner: string }[] }
+  | { type: "routine"; title: string }
+  | { type: "agent"; from: string; kid: string; kind: "tell" | "ask" };
 
 export type Memory = { id: string; text: string; kind: string; source: string; created_at: string };
 export type Ctx = { in_meeting: boolean; location: any; status: string | null } | null;
@@ -177,14 +196,15 @@ export const registerDevice = (token: string, platform: string) => post("registe
 
 // ---------------- assistant settings: personality, unfiltered mode, instructions ----------------
 export type Personality = "witty" | "warm" | "blunt" | "chill";
-export type Settings = { personality: Personality; unfiltered: boolean; adult_confirmed: boolean; instructions: string; unfiltered_available: boolean };
-export const DEFAULT_SETTINGS: Settings = { personality: "witty", unfiltered: false, adult_confirmed: false, instructions: "", unfiltered_available: false };
+export type Settings = { personality: Personality; unfiltered: boolean; adult_confirmed: boolean; instructions: string; unfiltered_available: boolean; look: AuraLook };
+export const DEFAULT_SETTINGS: Settings = { personality: "witty", unfiltered: false, adult_confirmed: false, instructions: "", unfiltered_available: false, look: DEFAULT_LOOK };
+const withLook = (x: Settings): Settings => ({ ...x, look: normalizeLook(x.look) });
 export const getSettings = async (): Promise<Settings> => {
-  try { const d = await post("settings", { op: "get" }); return { ...DEFAULT_SETTINGS, ...(d?.settings || {}) }; }
+  try { const d = await post("settings", { op: "get" }); return withLook({ ...DEFAULT_SETTINGS, ...(d?.settings || {}) }); }
   catch (e) { return DEFAULT_SETTINGS; }
 };
-export const saveSettings = async (patch: { personality?: Personality; unfiltered?: boolean; confirm_adult?: boolean; instructions?: string }): Promise<{ ok: boolean; settings?: Settings; error?: string }> => {
-  try { const d = await post("settings", { op: "set", ...patch }); return d?.ok ? { ok: true, settings: { ...DEFAULT_SETTINGS, ...d.settings } } : { ok: false, error: d?.error || "failed" }; }
+export const saveSettings = async (patch: { personality?: Personality; unfiltered?: boolean; confirm_adult?: boolean; instructions?: string; look?: AuraLook }): Promise<{ ok: boolean; settings?: Settings; error?: string }> => {
+  try { const d = await post("settings", { op: "set", ...patch }); return d?.ok ? { ok: true, settings: withLook({ ...DEFAULT_SETTINGS, ...d.settings }) } : { ok: false, error: d?.error || "failed" }; }
   catch (e) { return { ok: false, error: "network" }; }
 };
 export const forgetMemory = (id: string) => post("settings", { op: "forget", id });
@@ -210,4 +230,57 @@ export const subscribe = async (planId: string, successUrl?: string, cancelUrl?:
 };
 export const cancelSub = async (): Promise<boolean> => {
   try { const r = await authedFetch(`${BILLING}/cancel`, { method: "POST" }); return r.ok; } catch (e) { return false; }
+};
+
+// ---------------- memory graph (Kaeva port): what Aura knows, grouped ----------------
+export type ProfileGroup = { key: string; label: string; items: { id: string; text: string; target: string | null; relation?: string; context: string | null; detail?: string | null }[] };
+export const getProfile = async (): Promise<ProfileGroup[]> => {
+  try { const d = await post("memory", { op: "profile" }); return d?.groups || []; } catch (e) { return []; }
+};
+export const forgetFact = (id: string) => post("memory", { op: "forget", id });
+
+// ---------------- routines ----------------
+export type Routine = { id: string; kind: string; title: string; blurb: string | null; prompt: string; cadence: string; at: string; weekday: number | null; needs: string | null; active: boolean; last_run_at: string | null; next_run_at: string | null; last_result: string | null };
+export const getRoutines = async (): Promise<Routine[]> => {
+  try { const d = await post("routines", { op: "list" }); return d?.routines || []; } catch (e) { return []; }
+};
+export const updateRoutine = (id: string, patch: Partial<Pick<Routine, "active" | "at" | "cadence" | "title" | "prompt" | "weekday">>) => post("routines", { op: "update", id, ...patch });
+export const createRoutine = (r: { title: string; prompt: string; cadence: string; at: string; weekday?: number }) => post("routines", { op: "create", ...r });
+export const runRoutine = (id: string) => post("routines", { op: "run", id });
+export const deleteRoutine = (id: string) => post("routines", { op: "delete", id });
+
+// ---------------- apps over MCP ----------------
+export type McpServer = { id: string; name: string; url: string; status: string; last_error: string | null; tools: { name: string; description: string; read_only: boolean }[]; has_token: boolean };
+export const getMcpServers = async (): Promise<McpServer[]> => {
+  try { const d = await post("mcp", { op: "list" }); return d?.servers || []; } catch (e) { return []; }
+};
+export const addMcpServer = async (url: string, token?: string, name?: string): Promise<{ ok: boolean; server?: McpServer; error?: string }> => {
+  try { const d = await post("mcp", { op: "add", url, token, name }); return d?.ok ? { ok: true, server: d.server } : { ok: false, error: d?.error || "Couldn't connect." }; }
+  catch (e) { return { ok: false, error: "Can't reach Aura right now." }; }
+};
+export const removeMcpServer = (id: string) => post("mcp", { op: "remove", id });
+
+// ---------------- agents (Kaeva A2A over MCP) ----------------
+export type PairedAgent = { id: string; label: string; created_at: string; last_seen: string | null; recall_until: string | null };
+export const getAgents = async (): Promise<PairedAgent[]> => {
+  try { const d = await post("a2a", { op: "agents" }); return d?.agents || []; } catch (e) { return []; }
+};
+export const makeAgentCode = async (label?: string): Promise<{ code: string; endpoint: string } | null> => {
+  try { const d = await post("a2a", { op: "code", label }); return d?.code ? { code: d.code, endpoint: d.endpoint } : null; } catch (e) { return null; }
+};
+export const revokeAgent = (id: string) => post("a2a", { op: "revoke", id });
+export const replyAgent = async (id: string, body: string): Promise<boolean> => {
+  try { const d = await post("a2a", { op: "reply", id, body }); return !!d?.ok; } catch (e) { return false; }
+};
+
+// ---------------- money and trips ----------------
+export const getMoney = async (): Promise<MoneySummary | null> => {
+  try { const d = await post("money", { op: "summary" }); return d?.ok ? d : null; } catch (e) { return null; }
+};
+export const getTrips = async (): Promise<Trip[]> => {
+  try { const d = await post("travel", { op: "trips" }); return d?.trips || []; } catch (e) { return []; }
+};
+
+export const deleteAccount = async (): Promise<boolean> => {
+  try { const d = await post("settings", { op: "delete_account", confirm: "delete" }); return !!d?.ok; } catch (e) { return false; }
 };

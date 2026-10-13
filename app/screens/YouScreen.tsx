@@ -2,23 +2,33 @@ import React, { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import BrandIcon from "../components/BrandIcon";
-import { Button, Divider, IconName, Press, Section, Toggle } from "../components/ui";
+import Mark from "../components/Mark";
+import { Button, Divider, IconButton, IconName, Press, Section, Toggle } from "../components/ui";
 import { c, f, inputReset, layout, r, sp, t } from "../theme";
 import { PERSONALITIES } from "../lib/personality";
-import type { Personality, Settings } from "../lib/api";
+import type { McpServer, PairedAgent, Personality, Settings } from "../lib/api";
+import { personalityLabel } from "../lib/personality";
+import { swatch, TEXTURES } from "../lib/faces";
 
 const TOOLS: { key: string; slug: string; brand: string; label: string; icon: IconName; sub: string }[] = [
-  { key: "gmail", slug: "gmail", brand: "gmail", label: "Gmail", icon: "mail", sub: "Reads new mail, drafts replies for your OK" },
-  { key: "gcal", slug: "google-calendar", brand: "googlecalendar", label: "Google Calendar", icon: "calendar", sub: "Knows when you're busy and when you're free" },
-  { key: "notion", slug: "notion", brand: "notion", label: "Notion", icon: "file-text", sub: "Your notes and docs" },
-  { key: "slack", slug: "slack", brand: "slack", label: "Slack", icon: "slack", sub: "Catches messages that need you" },
+  { key: "gmail", slug: "gmail", brand: "gmail", label: "Gmail", icon: "mail", sub: "Read and write emails, find receipts" },
+  { key: "gcal", slug: "google-calendar", brand: "googlecalendar", label: "Google Calendar", icon: "calendar", sub: "Manage your calendar, prep for meetings" },
+  { key: "drive", slug: "googledrive", brand: "googledrive", label: "Google Drive", icon: "folder", sub: "Find and share files" },
+  { key: "slack", slug: "slack", brand: "slack", label: "Slack", icon: "slack", sub: "Search and send messages" },
+  { key: "notion", slug: "notion", brand: "notion", label: "Notion", icon: "file-text", sub: "Search your workspace" },
+  { key: "linear", slug: "linear", brand: "linear", label: "Linear", icon: "check-square", sub: "Manage issues" },
+  { key: "github", slug: "github", brand: "github", label: "GitHub", icon: "github", sub: "Track PRs and issues" },
+  { key: "todoist", slug: "todoist", brand: "todoist", label: "Todoist", icon: "check-circle", sub: "Your tasks, both ways" },
+  { key: "spotify", slug: "spotify", brand: "spotify", label: "Spotify", icon: "music", sub: "Play and queue music" },
+  { key: "strava", slug: "strava", brand: "strava", label: "Strava", icon: "activity", sub: "Your runs and rides" },
   { key: "whatsapp", slug: "", brand: "whatsapp", label: "WhatsApp", icon: "message-circle", sub: "Not available yet" },
-  { key: "bank", slug: "", brand: "", label: "Bank and cards", icon: "credit-card", sub: "Not available yet" },
 ];
 
-export default function YouScreen({ settings, onSettings, onUnfiltered, serverConnected, onConnect, isPro, onUpgrade, onSignOut }: {
+export default function YouScreen({ settings, onSettings, onUnfiltered, serverConnected, onConnect, isPro, onUpgrade, onSignOut, onPersonalize, mcp, onAddMcp, onRemoveMcp, agents, onPairAgent, onRevokeAgent, onDeleteAccount }: {
   settings: Settings; onSettings: (patch: { personality?: Personality; instructions?: string }) => Promise<boolean>; onUnfiltered: (on: boolean) => void;
   serverConnected: string[]; onConnect: (slug: string) => void; isPro: boolean; onUpgrade: () => void; onSignOut: () => void;
+  onPersonalize: () => void; mcp: McpServer[]; onAddMcp: () => void; onRemoveMcp: (s: McpServer) => void;
+  agents: PairedAgent[]; onPairAgent: () => void; onRevokeAgent: (a: PairedAgent) => void; onDeleteAccount: () => void;
 }) {
   const [instr, setInstr] = useState(settings.instructions);
   const [focused, setFocused] = useState(false);
@@ -30,6 +40,15 @@ export default function YouScreen({ settings, onSettings, onUnfiltered, serverCo
   return (
     <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <Text style={t.display} accessibilityRole="header">You</Text>
+
+      <Press onPress={onPersonalize} style={s.hero} scaleTo={0.99} accessibilityLabel="Change how Aura looks">
+        <Mark size={88} backdrop />
+        <View style={{ flex: 1 }}>
+          <Text style={t.title2}>Aura</Text>
+          <Text style={[t.footnote, { marginTop: 2 }]}>{personalityLabel(settings.personality)}  ·  {TEXTURES.find((x) => x.key === settings.look.texture)?.label} {swatch(settings.look.color).label.toLowerCase()}</Text>
+          <Text style={[t.label, { marginTop: sp.s, color: c.accentText }]}>Personalize</Text>
+        </View>
+      </Press>
 
       <Section title="Personality" meta="How Aura talks to you">
         {PERSONALITIES.map((p, i) => {
@@ -91,11 +110,54 @@ export default function YouScreen({ settings, onSettings, onUnfiltered, serverCo
                 </View>
                 {on ? (
                   <View style={s.on}><Feather name="check" size={14} color={c.ink} /><Text style={s.onTxt}>Connected</Text></View>
-                ) : can ? <Button label="Connect" size="sm" variant="secondary" onPress={() => onConnect(x.slug)} /> : null}
+                ) : can ? <IconButton icon="plus" size={32} onPress={() => onConnect(x.slug)} label={`Connect ${x.label}`} style={{ borderRadius: 16 }} /> : null}
               </View>
             </View>
           );
         })}
+      </Section>
+
+      <Section title="MCP servers" action="Add" onAction={onAddMcp}>
+        {mcp.length ? mcp.map((m, i) => (
+          <View key={m.id}>
+            {i > 0 ? <Divider inset={38} /> : null}
+            <View style={s.tool}>
+              <View style={s.logo}><Feather name="server" size={18} color={m.status === "ok" ? c.ink2 : c.accentText} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={t.label}>{m.name}</Text>
+                <Text style={[t.footnote, { marginTop: 2 }, m.status !== "ok" && { color: c.accentText }]} numberOfLines={1}>{m.status === "ok" ? `${m.tools.length} tool${m.tools.length === 1 ? "" : "s"}  ·  ${hostOf(m.url)}` : m.last_error || "Can't reach it"}</Text>
+              </View>
+              <IconButton icon="x" size={32} variant="plain" color={c.ink2} onPress={() => onRemoveMcp(m)} label={`Remove ${m.name}`} />
+            </View>
+          </View>
+        )) : (
+          <Press onPress={onAddMcp} style={s.tool} scaleTo={0.99} accessibilityLabel="Connect an MCP server">
+            <View style={s.logo}><Feather name="server" size={18} color={c.ink2} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={t.label}>Connect any MCP server</Text>
+              <Text style={[t.footnote, { marginTop: 2 }]}>Your company's tools, Zapier, anything with a server address</Text>
+            </View>
+            <Feather name="plus" size={18} color={c.ink} />
+          </Press>
+        )}
+      </Section>
+
+      <Section title="Agents" action="Pair" onAction={onPairAgent}>
+        {agents.length ? agents.map((a, i) => (
+          <View key={a.id}>
+            {i > 0 ? <Divider inset={38} /> : null}
+            <View style={s.tool}>
+              <View style={s.logo}><Feather name="cpu" size={18} color={c.ink2} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={t.label}>{a.label}</Text>
+                <Text style={[t.footnote, { marginTop: 2 }]}>{a.recall_until ? `Can read your memory until ${timeOf(a.recall_until)}` : `Paired ${dayOf(a.created_at)}. Asks before reading or acting`}</Text>
+              </View>
+              <Button label="Remove" size="sm" variant="ghost" onPress={() => onRevokeAgent(a)} />
+            </View>
+          </View>
+        )) : (
+          <Text style={[t.callout, { paddingVertical: 14 }]}>Let another agent, like Claude or a work bot, message you through Aura and ask to use your memory. You approve every read and every action.</Text>
+        )}
       </Section>
 
       <Section title="Plan">
@@ -113,13 +175,23 @@ export default function YouScreen({ settings, onSettings, onUnfiltered, serverCo
           <Text style={[t.label, { flex: 1 }]}>Sign out</Text>
           <Feather name="log-out" size={17} color={c.ink2} />
         </Press>
+        <Divider />
+        <Press onPress={onDeleteAccount} style={s.row} scaleTo={0.99} accessibilityLabel="Delete account and data">
+          <Text style={[t.label, { flex: 1, color: c.accentText }]}>Delete account and data</Text>
+          <Feather name="trash-2" size={17} color={c.accentText} />
+        </Press>
       </Section>
       <Text style={[t.footnote, { marginTop: sp.h }]}>Aura 1.0</Text>
     </ScrollView>
   );
 }
 
+const hostOf = (u: string) => { try { return new URL(u).hostname; } catch (_) { return u; } };
+const timeOf = (iso: string) => { const d = new Date(iso); const h = d.getHours(); return `${h % 12 || 12}:${String(d.getMinutes()).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`; };
+const dayOf = (iso: string) => { const d = new Date(iso); return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getMonth()]} ${d.getDate()}`; };
+
 const s = StyleSheet.create({
+  hero: { flexDirection: "row", alignItems: "center", gap: sp.l, marginTop: sp.xl, paddingVertical: sp.s },
   scroll: { paddingHorizontal: layout.page, paddingTop: sp.xl, paddingBottom: 56 },
   option: { flexDirection: "row", alignItems: "flex-start", gap: 14, paddingVertical: 14 },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: c.control, alignItems: "center", justifyContent: "center", marginTop: 1 },

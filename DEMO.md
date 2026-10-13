@@ -1,22 +1,25 @@
 # Aura demo
 
-**One line:** Aura is a personal AI for your work and your life. It remembers you, has a personality you pick, does things in your real apps with your OK, and for adults who opt in, it answers without the lectures.
+**One line:** Aura is a personal AI for your work and your life. It remembers you, books and plans for you with your OK, runs routines on its own, works with any app or agent over MCP, and looks however you dress it.
 
-## The 90-second demo (on the iPhone)
+## The two-minute demo (on the iPhone)
 
-1. **First run.** Pick a personality (try Witty), then answer "What's on your plate?" with a few lines about work and life. Aura shows back what it picked up. *"It knows you after one message."*
-2. **Aura tab.** Ask *"anything i'm forgetting today?"* It answers across work and life from memory, in the voice you picked.
-3. **Demo: "Urgent email arrives".** Long-press the vermilion dot at the top of the chat to open the demo triggers (in development builds there's also a Demo button). An **Urgent** card shows the full reply Aura drafted. Edit it if you like, then **Send reply**. It waits five seconds behind Undo, then sends through Gmail.
-4. **Demo: "Walk past a bakery".** Aura suggests picking up the cake a friend would love, with a **From memory** line showing why. Approve and it's ordered on the Aura card.
-5. **Memory tab.** Everything Aura knows about you, your people and your reminders. Forget one fact (with Undo). *"Memory you can see and control."*
-6. **You tab.** Switch personality to Blunt and ask the same question again. Then, once Unblock is connected, show **Unfiltered**: the 18+ confirmation, and the chat header now reads "Blunt · Unfiltered".
+1. **Welcome.** A crowd of Auras, each dressed differently. Get started, then **Make Aura yours**: pick a color, texture, accessory. *"It's yours from the first screen."*
+2. **First run.** Pick a personality, answer "What's on your plate?". Aura shows back what it learned.
+3. **Food.** Ask *"find a great italian place for 4 on friday at 8"*. Places come back near you with ratings and Book a table. Tap it; approve the card; the booking page opens and dinner lands on your calendar.
+4. **Travel.** Ask *"flights to lisbon march 10 to 17"*. Real fares; tap one to book (approve the card). Then *"plan the trip, we like food and walking"*: a day-by-day plan appears, and it's on Today.
+5. **Memory.** Memory tab: Likes, Doesn't like, Work, Life, learned from conversation, each one forgettable. Tell Aura *"actually i moved to oakland"* and Home updates.
+6. **Routines.** Today: Morning brief is on. Open it, Run it now. Turn on Meeting prep.
+7. **Money.** *"how much have i spent on eating out this month?"*: categories against budgets, recurring charges.
+8. **Apps and agents.** You tab: connect an MCP server by address. Pair an agent with the code; when it asks something, it shows up in chat with Reply.
+9. **Demo triggers.** Long-press Aura's face in the chat header (or the Demo button in development builds) for the urgent-email and bakery scenarios.
+10. **Unfiltered**, once Unblock is connected: the 18+ confirmation, then the header reads "Blunt · Unfiltered".
 
-> Everything is one engine: `capture → remember → recall → decide → propose → approve → execute → learn`. The demo flows are config on it.
+> One engine: `capture → remember → recall → decide → propose → approve → execute → learn`.
 
 ## Architecture
 
-- **Expo (React Native)** app: Aura, Today, Memory and You tabs in ABC Diatype, local notifications, live via polling.
-- **Butterbase** backend: Postgres (memories, cards, actions, settings), serverless functions (`agent`, `settings`, `feed`, `simulate`, `approve`), Claude via the AI gateway. App id `app_6nromeez40uq`.
-- **HydraDB**: memory of record (per user via tenant and sub-tenant). The Postgres mirror is the fallback.
-- **Composio** for Gmail, Calendar, Notion and Slack. **AgentCard** (test mode) for paying, with your OK.
-- **Unblock** for Unfiltered mode. Needs `UNBLOCK_API_KEY` and `UNBLOCK_MODEL` on the server; until then the toggle shows "Not connected". See the README for what's wired.
+- **Expo (React Native)**: Aura, Today, Memory and You tabs in ABC Diatype; designed SVG characters; rich results in chat.
+- **Butterbase**: Postgres and serverless functions (`agent`, `memory`, `web`, `places`, `travel`, `money`, `routines`, `routine_tick`, `mcp`, `a2a`, `approve`, `settings`, `capture`), Claude via the AI gateway. App id `app_6nromeez40uq`.
+- **Kaeva, ported**: memory graph, context ranker, A2A over MCP, privacy fingerprints. **Unblock** for Unfiltered.
+- **Composio** for Gmail, Calendar and other apps; **Google Places**, **Duffel**, **Exa/Tavily/Brave** when keys are set. See the README for every env var.
