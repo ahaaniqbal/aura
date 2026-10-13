@@ -1,7 +1,7 @@
 // Aura backend client. Every request carries the user's JWT; the backend derives the
 // user from the token (ctx.user.id) and enforces per-user RLS. No hardcoded user.
 import * as SecureStore from "expo-secure-store";
-import { AuraLook, DEFAULT_LOOK, normalizeLook } from "./faces";
+import { AuraLook, DEFAULT_LOOK, normalizeLook } from "./auras";
 
 const APP = "app_6nromeez40uq";
 export const API = `https://api.butterbase.ai/v1/${APP}/fn`;

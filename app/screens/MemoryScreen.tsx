@@ -195,7 +195,7 @@ function PeopleList({ people, q, setQ, onOpen }: { people: GraphPerson[]; q: str
     const label = care ? "On their mind" : b !== null && b <= 14 ? `Birthday ${inDays(b).toLowerCase()}` : p.open_promises?.length ? "You owe them" : isDrifting(p) ? "It's been a while" : null;
     const signal = care || (b !== null && b <= 3);
     const line = capitalize([p.relation, p.org, st.lastLabel ? `last spoke ${st.lastLabel}` : null].filter(Boolean).join(" · ")) || "Someone you know";
-    return { p, label, signal, line, party: b !== null && b <= 14, cl: closeness(p) };
+    return { p, label, signal, line, cl: closeness(p) };
   }).sort((a, b) => Number(!!b.label) - Number(!!a.label) || b.cl - a.cl), [people]);
   const query = q.trim().toLowerCase();
   const shown = rows.filter((x) => !query || [x.p.person, x.p.relation, x.p.org].some((v) => (v || "").toLowerCase().includes(query)));
@@ -212,7 +212,7 @@ function PeopleList({ people, q, setQ, onOpen }: { people: GraphPerson[]; q: str
         <View key={x.p.person}>
           {i > 0 ? <Divider inset={60} /> : null}
           <Press onPress={() => onOpen(x.p.person)} style={s.person} scaleTo={0.99} accessibilityLabel={`${x.p.person}${x.label ? `, ${x.label}` : ""}`}>
-            <Avatar name={x.p.person} size={44} signal={x.signal} party={x.party} />
+            <Avatar name={x.p.person} size={44} signal={x.signal} />
             <View style={{ flex: 1 }}>
               <Text style={t.headline} numberOfLines={1}>{x.p.person}</Text>
               <Text style={[t.footnote, { marginTop: 2 }]} numberOfLines={1}>{x.line}</Text>

@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from "react";
-import { AuraLook, DEFAULT_LOOK } from "../lib/faces";
+import { AuraLook, DEFAULT_LOOK } from "../lib/auras";
 
 // How this person has dressed Aura up. Provided once at the root so every Mark matches.
 const LookContext = createContext<AuraLook>(DEFAULT_LOOK);

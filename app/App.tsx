@@ -32,7 +32,7 @@ import {
   simulate, subscribe, syncEmail, getProfile, forgetFact, ProfileGroup, getRoutines, updateRoutine, runRoutine, deleteRoutine, Routine,
   getMcpServers, addMcpServer, removeMcpServer, McpServer, getAgents, makeAgentCode, revokeAgent, replyAgent, PairedAgent, getMoney, MoneySummary, getTrips, Trip, deleteAccount,
 } from "./lib/api";
-import { AuraLook, DEFAULT_LOOK } from "./lib/faces";
+import { AuraLook, DEFAULT_LOOK } from "./lib/auras";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);

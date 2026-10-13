@@ -7,11 +7,11 @@ import MicButton from "./MicButton";
 import { Button, Divider, EASE_OUT, IconButton, Press } from "./ui";
 import { c, f, inputReset, r, sp, t } from "../theme";
 import { addNote, agent, getFeed, Personality, saveSettings } from "../lib/api";
-import { AuraLook, DEFAULT_LOOK } from "../lib/faces";
+import { AuraLook, DEFAULT_LOOK } from "../lib/auras";
 import Personalize from "./Personalize";
 import { PERSONALITIES } from "../lib/personality";
 
-// First run. You dress Aura up first (it's yours), then tell it your name, how it should talk and
+// First run. You pick the colors Aura glows in, then tell it your name, how it should talk and
 // what's on your plate. It closes on vermilion with Aura showing back what it already knows.
 export default function Onboarding({ onDone, initialName, onLook }: { onDone: () => void; initialName?: string; onLook?: (l: AuraLook) => void }) {
   const [step, setStep] = useState(0);
@@ -66,8 +66,8 @@ export default function Onboarding({ onDone, initialName, onLook }: { onDone: ()
             <View style={s.fill}>
               <View style={s.lookHead}>
                 <Text style={t.caption}>1 of {qSteps.length}</Text>
-                <Text style={[t.title1, { marginTop: sp.s }]}>Make Aura yours</Text>
-                <Text style={[t.callout, { marginTop: sp.xs }]}>Pick a look. You can change it anytime.</Text>
+                <Text style={[t.title1, { marginTop: sp.s }]}>Pick Aura's colors</Text>
+                <Text style={[t.callout, { marginTop: sp.xs }]}>This is how Aura shows up for you. You can change it anytime.</Text>
               </View>
               <Personalize inline initial={look} onSave={saveLook} saveLabel="Continue" />
             </View>
@@ -142,7 +142,6 @@ export default function Onboarding({ onDone, initialName, onLook }: { onDone: ()
           {step === 5 && (
             <ScrollView contentContainerStyle={s.scrollPage}>
               <View style={{ flex: 1, justifyContent: "center", paddingVertical: sp.h }}>
-                <Mark size={96} style={{ marginBottom: sp.l }} />
                 <Text style={t.display}>{firstName ? `Aura's ready, ${firstName}.` : "Aura's ready."}</Text>
                 {known.length ? (
                   <>

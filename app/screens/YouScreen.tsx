@@ -8,7 +8,7 @@ import { c, f, inputReset, layout, r, sp, t } from "../theme";
 import { PERSONALITIES } from "../lib/personality";
 import type { McpServer, PairedAgent, Personality, Settings } from "../lib/api";
 import { personalityLabel } from "../lib/personality";
-import { swatch, TEXTURES } from "../lib/faces";
+import { palette } from "../lib/auras";
 
 const TOOLS: { key: string; slug: string; brand: string; label: string; icon: IconName; sub: string }[] = [
   { key: "gmail", slug: "gmail", brand: "gmail", label: "Gmail", icon: "mail", sub: "Triage, drafts for your OK, receipts" },
@@ -41,12 +41,12 @@ export default function YouScreen({ settings, onSettings, onUnfiltered, serverCo
     <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <Text style={t.display} accessibilityRole="header">You</Text>
 
-      <Press onPress={onPersonalize} style={s.hero} scaleTo={0.99} accessibilityLabel="Change how Aura looks">
-        <Mark size={88} backdrop />
+      <Press onPress={onPersonalize} style={s.hero} scaleTo={0.99} accessibilityLabel="Change Aura's colors">
+        <Mark size={88} />
         <View style={{ flex: 1 }}>
           <Text style={t.title2}>Aura</Text>
-          <Text style={[t.footnote, { marginTop: 2 }]}>{personalityLabel(settings.personality)}  ·  {TEXTURES.find((x) => x.key === settings.look.texture)?.label} {swatch(settings.look.color).label.toLowerCase()}</Text>
-          <Text style={[t.label, { marginTop: sp.s, color: c.accentText }]}>Personalize</Text>
+          <Text style={[t.footnote, { marginTop: 2 }]}>{personalityLabel(settings.personality)}  ·  {palette(settings.look.palette).label}</Text>
+          <Text style={[t.label, { marginTop: sp.s, color: c.accentText }]}>Change colors</Text>
         </View>
       </Press>
 

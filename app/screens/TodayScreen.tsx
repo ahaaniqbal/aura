@@ -167,7 +167,7 @@ export default function TodayScreen({ loaded, approvals, onAct, onEdit, busy, sc
           <View key={n.key}>
             {i > 0 ? <Divider inset={56} /> : null}
             <Press onPress={() => n.person && onOpenPerson(n.person)} disabled={!n.person} style={s.row} scaleTo={0.99} accessibilityLabel={`${n.title}. ${n.label}`}>
-              <Avatar name={n.person || "?"} size={40} signal={n.tone === "accent"} party={n.key.startsWith("b:")} />
+              <Avatar name={n.person || "?"} size={40} signal={n.tone === "accent"} />
               <View style={{ flex: 1 }}>
                 <Text style={t.label}>{n.title}</Text>
                 <Text style={[t.callout, { marginTop: 3 }]} numberOfLines={2}>

@@ -1,36 +1,39 @@
 import React, { useEffect, useId, useMemo, useRef } from "react";
-import { Animated, Easing, Text, View } from "react-native";
+import { Animated, Easing, Image, Text, View } from "react-native";
 import { SvgXml } from "react-native-svg";
 import { c, f } from "../theme";
-import { AuraLook, auraSvg } from "../lib/faces";
+import { AuraLook, glowSvg } from "../lib/auras";
 import { useLook } from "./look";
 
+const GRAIN = require("../assets/grain-disc.png"); // grain that fades out with the glow
 export type MarkState = "idle" | "thinking";
 
-// Aura's mark is Aura itself: a small sun with a face, dressed however you chose. It holds still
-// at rest and bobs while Aura is working. `look` overrides the saved look (previews, pickers).
-export default function Mark({ size = 28, state = "idle", look, backdrop, style }: { size?: number; state?: MarkState; look?: Partial<AuraLook>; backdrop?: boolean; style?: any }) {
+// Aura's mark: the vermilion dot inside its own aura, in the palette the person picked. The dot
+// holds still; the glow breathes while Aura is working. `look` overrides the saved one (pickers).
+export default function Mark({ size = 28, state = "idle", look, dot: showDot = true, style }: { size?: number; state?: MarkState; look?: AuraLook; dot?: boolean; style?: any }) {
   const saved = useLook();
+  const key = (look || saved).palette;
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
-  const l = look || saved;
-  const xml = useMemo(() => auraSvg(l, uid, { backdrop }), [JSON.stringify(l), uid, backdrop]);
+  const xml = useMemo(() => glowSvg(key, uid), [key, uid]);
   const a = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (state !== "thinking") { a.setValue(0); return; }
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(a, { toValue: 1, duration: 420, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.timing(a, { toValue: 0, duration: 420, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.timing(a, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(a, { toValue: 0, duration: 700, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ]));
     loop.start();
     return () => loop.stop();
   }, [state]);
-  const lift = a.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.08] });
-  const squash = a.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
+  const dot = Math.round(size * 0.3);
   return (
-    <View accessibilityLabel={state === "thinking" ? "Aura is working" : "Aura"} style={[{ width: size, height: size }, style]}>
-      <Animated.View style={{ width: size, height: size, transform: [{ translateY: lift }, { scaleY: squash }] }}>
+    <View accessibilityLabel={state === "thinking" ? "Aura is working" : "Aura"} style={[{ width: size, height: size, alignItems: "center", justifyContent: "center" }, style]}>
+      <Animated.View style={{ position: "absolute", width: size, height: size, borderRadius: size / 2, overflow: "hidden",
+        opacity: a.interpolate({ inputRange: [0, 1], outputRange: [1, 0.7] }), transform: [{ scale: a.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] }) }] }}>
         <SvgXml xml={xml} width={size} height={size} />
+        {size >= 40 ? <Image source={GRAIN} resizeMode="stretch" style={{ position: "absolute", top: 0, left: 0, width: size, height: size, opacity: 0.6 }} /> : null}
       </Animated.View>
+      {showDot ? <View style={{ width: dot, height: dot, borderRadius: dot / 2, backgroundColor: c.accent }} /> : null}
     </View>
   );
 }
