@@ -68,7 +68,7 @@ export function Button({ label, onPress, variant = "primary", size = "lg", icon,
 }
 
 // Text action in Aura's voice color: the lightest affordance, for secondary paths.
-export function LinkButton({ label, icon, onPress, color = c.accent, style }: { label: string; icon?: IconName; onPress?: () => void; color?: string; style?: any }) {
+export function LinkButton({ label, icon, onPress, color = c.accentText, style }: { label: string; icon?: IconName; onPress?: () => void; color?: string; style?: any }) {
   return (
     <Press onPress={onPress} hitSlop={8} accessibilityLabel={label} style={[{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6 }, style]}>
       {icon ? <Feather name={icon} size={15} color={color} /> : null}
@@ -92,7 +92,7 @@ export function Status({ label, tone = "muted", dot, style }: { label: string; t
   const col = toneColor[tone];
   return (
     <View style={[{ flexDirection: "row", alignItems: "center", gap: 6 }, style]}>
-      {dot ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: tone === "signal" ? c.signal : col }} /> : null}
+      {dot ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: tone === "accent" ? c.accent : col }} /> : null}
       <Text style={{ fontFamily: f.medium, fontSize: 13, letterSpacing: -0.05, color: col }} numberOfLines={1}>{label}</Text>
     </View>
   );
@@ -121,7 +121,7 @@ export function Tabs<T extends string>({ options, value, onChange, style, onDark
   const on = onDark ? c.onAccent : c.ink;
   const off = onDark ? c.onAccentMuted : c.muted;
   return (
-    <View style={[{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: onDark ? "rgba(254,254,255,0.4)" : c.lineStrong }, style]}>
+    <View style={[{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: onDark ? "rgba(13,14,18,0.3)" : c.lineStrong }, style]}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 22 }}>
         {options.map((o) => {
           const sel = o.key === value;
@@ -169,9 +169,23 @@ export function Empty({ title, body, children, style }: { title: string; body: s
   return (
     <View style={[{ paddingVertical: sp.xl }, style]}>
       <Text style={t.headline}>{title}</Text>
-      <Text style={[t.subhead, { marginTop: 4, maxWidth: 320 }]}>{body}</Text>
+      <Text style={[t.callout, { marginTop: 4, maxWidth: 320 }]}>{body}</Text>
       {children ? <View style={{ marginTop: sp.l, alignItems: "flex-start" }}>{children}</View> : null}
     </View>
+  );
+}
+
+// On/off switch. Vermilion when on, because an on switch is Aura doing something for you.
+export function Toggle({ value, onChange, disabled, label }: { value: boolean; onChange: (v: boolean) => void; disabled?: boolean; label: string }) {
+  const a = useRef(new Animated.Value(value ? 1 : 0)).current;
+  useEffect(() => { Animated.timing(a, { toValue: value ? 1 : 0, duration: 180, easing: EASE_OUT, useNativeDriver: false }).start(); }, [value]);
+  return (
+    <Pressable onPress={() => !disabled && onChange(!value)} disabled={disabled} hitSlop={8} accessibilityRole="switch" accessibilityState={{ checked: value, disabled: !!disabled }} accessibilityLabel={label}
+      style={{ opacity: disabled ? 0.4 : 1 }}>
+      <Animated.View style={{ width: 48, height: 28, borderRadius: 14, padding: 3, backgroundColor: a.interpolate({ inputRange: [0, 1], outputRange: [c.lineStrong, c.accent] }) }}>
+        <Animated.View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: c.surface, transform: [{ translateX: a.interpolate({ inputRange: [0, 1], outputRange: [0, 20] }) }] }} />
+      </Animated.View>
+    </Pressable>
   );
 }
 
@@ -197,13 +211,14 @@ export function Toast({ text, action, onAction }: { text: string | null; action?
 export const ui = StyleSheet.create({
   sectionRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: c.ink, paddingTop: 10, marginBottom: sp.xs },
   sectionTitle: { fontFamily: f.medium, fontSize: 13.5, letterSpacing: -0.05, color: c.ink },
-  sectionAction: { fontFamily: f.medium, fontSize: 13.5, letterSpacing: -0.05, color: c.accent },
+  sectionAction: { fontFamily: f.medium, fontSize: 13.5, letterSpacing: -0.05, color: c.accentText },
   box: { backgroundColor: c.surface, borderRadius: r.md, borderWidth: 1, borderColor: c.line },
-  field: { backgroundColor: c.surface, borderRadius: r.md, borderWidth: 1, borderColor: c.lineStrong },
+  field: { backgroundColor: c.surface, borderRadius: r.md, borderWidth: 1, borderColor: c.control },
+  fieldFocus: { borderColor: c.ink },
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: c.canvas, borderTopLeftRadius: r.lg, borderTopRightRadius: r.lg, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 34, ...shadow.float },
   grabber: { alignSelf: "center", width: 36, height: 4, borderRadius: 2, backgroundColor: c.lineStrong, marginBottom: sp.l },
   toastWrap: { position: "absolute", left: 12, right: 12, bottom: 8 },
   toast: { flexDirection: "row", alignItems: "center", gap: sp.l, backgroundColor: c.ink, borderRadius: r.md, paddingHorizontal: 16, paddingVertical: 14 },
   toastTxt: { flex: 1, fontFamily: f.regular, fontSize: 14.5, color: c.onInk },
-  toastAction: { fontFamily: f.medium, fontSize: 14.5, color: c.onAccentMuted },
+  toastAction: { fontFamily: f.medium, fontSize: 14.5, color: c.accent },
 });

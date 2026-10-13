@@ -55,7 +55,7 @@ export default function ActionCard({ card, onAct, onEdit, busy, swipe }: { card:
     return (
       <View style={s.done}>
         <Feather name="check" size={14} color={c.ink2} />
-        <Text style={[t.subhead, { flex: 1 }]} numberOfLines={1}>{capitalize(card.title)}</Text>
+        <Text style={[t.callout, { flex: 1 }]} numberOfLines={1}>{capitalize(card.title)}</Text>
         <Text style={t.caption}>{card.status === "done" ? "Done" : "Approved"}</Text>
       </View>
     );
@@ -69,11 +69,11 @@ export default function ActionCard({ card, onAct, onEdit, busy, swipe }: { card:
     <Animated.View style={[ui.box, s.card, { transform: [{ translateX: pan }] }]} {...(swipe ? responder.panHandlers : {})}>
       {swipe ? (
         <>
-          <Animated.Text pointerEvents="none" style={[s.stamp, { left: 16, color: c.accent, opacity: yesOp }]}>{verbFor(card)}</Animated.Text>
+          <Animated.Text pointerEvents="none" style={[s.stamp, { left: 16, color: c.accentText, opacity: yesOp }]}>{verbFor(card)}</Animated.Text>
           <Animated.Text pointerEvents="none" style={[s.stamp, { right: 16, color: c.muted, opacity: noOp }]}>Not now</Animated.Text>
         </>
       ) : null}
-      <Status label={kind} tone={card.type === "urgent" ? "signal" : "muted"} dot={card.type === "urgent"} />
+      <Status label={kind} tone={card.type === "urgent" ? "accent" : "muted"} dot={card.type === "urgent"} />
       <Text style={[t.title2, { marginTop: 6 }]}>{capitalize(card.title)}</Text>
       {card.body ? (
         reply ? (
@@ -84,7 +84,7 @@ export default function ActionCard({ card, onAct, onEdit, busy, swipe }: { card:
       ) : null}
       {mem ? (
         <View style={s.memory}>
-          <Feather name="bookmark" size={12} color={c.accent} />
+          <Feather name="bookmark" size={12} color={c.accentText} />
           <Text style={s.memoryTxt} numberOfLines={2}>From memory: {mem}</Text>
         </View>
       ) : null}
@@ -101,7 +101,7 @@ const s = StyleSheet.create({
   card: { padding: sp.l, marginTop: sp.m, marginBottom: sp.s },
   draft: { marginTop: sp.m, paddingTop: sp.m, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
   memory: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: sp.m },
-  memoryTxt: { fontFamily: f.medium, fontSize: 13, lineHeight: 17, color: c.accent, flexShrink: 1, marginTop: -2 },
+  memoryTxt: { fontFamily: f.medium, fontSize: 13, lineHeight: 17, color: c.accentText, flexShrink: 1, marginTop: -2 },
   actions: { flexDirection: "row", alignItems: "center", gap: sp.s, marginTop: sp.l },
   stamp: { position: "absolute", top: 16, zIndex: 5, fontFamily: f.medium, fontSize: 13 },
   done: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: c.line, marginTop: sp.s },

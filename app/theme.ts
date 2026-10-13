@@ -1,7 +1,7 @@
-// Aura design system v4: Swiss precision.
+// Aura design system v5: Swiss precision, one signal.
 // A cool, flat canvas where typography carries the design and hairlines do the separating.
-// Two accents with strict jobs: cobalt is Aura itself (its mark, its voice, links, focus,
-// brand surfaces); signal orange means "needs you now" and nothing else. Everything else is ink.
+// One accent, vermilion, with one job: Aura itself. Its mark, its voice, its brand fields, and
+// anything it is asking of you right now. Everything else is ink.
 import { Platform, StyleSheet } from "react-native";
 
 export const c = {
@@ -11,29 +11,26 @@ export const c = {
   ink: "#0D0E12",           // text and primary buttons
   ink2: "#4A4D57",          // secondary text
   muted: "#6B6E79",         // tertiary text (4.9:1 on canvas)
-  faint: "#A3A6AF",         // placeholders, inactive icons
+  faint: "#7A7D87",         // placeholders (4:1)
+  control: "#8D909A",       // input borders, checkboxes (3.3:1)
   line: "#E3E5EA",          // hairlines
-  lineStrong: "#CDD0D7",    // rules, outlines
+  lineStrong: "#CDD0D7",    // decorative rules and outlines
 
-  accent: "#1A3CF0",        // cobalt: Aura, links, focus, selection, brand surfaces
-  accentTint: "#E8ECFE",
-  onAccent: "#FEFEFF",
-  onAccentMuted: "#C9D2FF", // secondary text on cobalt (4.8:1)
-
-  signal: "#FF4F12",        // attention fill: badges, dots, recording
-  signalText: "#C93A06",    // attention text (5:1 on canvas)
-  signalTint: "#FFEDE6",
+  accent: "#FF4F12",        // vermilion fill: mark, brand fields, attention dots, recording
+  accentText: "#C93A06",    // vermilion text on canvas (5:1)
+  accentTint: "#FFEDE6",
+  onAccent: "#0D0E12",      // text on vermilion (5.9:1)
+  onAccentMuted: "#3A1405", // secondary text on vermilion (5:1)
 
   scrim: "rgba(13,14,18,0.4)",
   onInk: "#FEFEFF",
 };
 
-export type Tone = "neutral" | "muted" | "accent" | "signal";
+export type Tone = "neutral" | "muted" | "accent";
 export const toneColor: Record<Tone, string> = {
   neutral: c.ink2,
   muted: c.muted,
-  accent: c.accent,
-  signal: c.signalText,
+  accent: c.accentText,
 };
 
 export const f = {
@@ -50,19 +47,19 @@ export const fontAssets = {
   [f.black]: require("./assets/fonts/ABCDiatype-Black.otf"),
 };
 
-// Type scale. Diatype runs tight at display sizes and neutral at reading sizes. Display is the
-// one place the type gets loud; everything below it steps down by at least 1.2x.
+// Type scale: six reading sizes and three display sizes. Diatype runs tight at display sizes
+// and neutral at reading sizes.
 export const t = StyleSheet.create({
+  hero: { fontFamily: f.medium, fontSize: 48, lineHeight: 49, letterSpacing: -2.2, color: c.ink },
   display: { fontFamily: f.medium, fontSize: 38, lineHeight: 41, letterSpacing: -1.6, color: c.ink },
   title1: { fontFamily: f.medium, fontSize: 28, lineHeight: 32, letterSpacing: -0.9, color: c.ink },
   title2: { fontFamily: f.medium, fontSize: 21, lineHeight: 26, letterSpacing: -0.5, color: c.ink },
   headline: { fontFamily: f.medium, fontSize: 16, lineHeight: 21, letterSpacing: -0.2, color: c.ink },
+  label: { fontFamily: f.medium, fontSize: 15, lineHeight: 19, letterSpacing: -0.15, color: c.ink },
   body: { fontFamily: f.regular, fontSize: 16, lineHeight: 23, letterSpacing: -0.1, color: c.ink },
   callout: { fontFamily: f.regular, fontSize: 15, lineHeight: 21, letterSpacing: -0.1, color: c.ink2 },
-  subhead: { fontFamily: f.regular, fontSize: 14, lineHeight: 19, color: c.ink2 },
   footnote: { fontFamily: f.regular, fontSize: 13, lineHeight: 17, color: c.muted },
-  label: { fontFamily: f.medium, fontSize: 15, lineHeight: 19, letterSpacing: -0.15, color: c.ink },
-  caption: { fontFamily: f.medium, fontSize: 12.5, lineHeight: 16, color: c.muted },
+  caption: { fontFamily: f.medium, fontSize: 13, lineHeight: 16, color: c.muted },
 });
 
 export const sp = { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, h: 32, xh: 40 };
@@ -74,5 +71,5 @@ export const shadow = {
   float: { shadowColor: "#0D0E12", shadowOpacity: 0.16, shadowRadius: 30, shadowOffset: { width: 0, height: 10 }, elevation: 10 },
 };
 
-// Text inputs draw their own focus state; drop the browser focus box on the web build.
+// Inputs draw their own focus state (an ink border); drop the browser focus box on the web build.
 export const inputReset: any = Platform.OS === "web" ? { outlineStyle: "none" } : null;

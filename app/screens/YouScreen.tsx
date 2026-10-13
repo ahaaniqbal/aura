@@ -1,9 +1,11 @@
-import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import BrandIcon from "../components/BrandIcon";
-import { Button, Divider, IconName, Press, Section } from "../components/ui";
-import { c, f, layout, r, sp, t } from "../theme";
+import { Button, Divider, IconName, Press, Section, Toggle } from "../components/ui";
+import { c, f, inputReset, layout, r, sp, t } from "../theme";
+import { PERSONALITIES } from "../lib/personality";
+import type { Personality, Settings } from "../lib/api";
 
 const TOOLS: { key: string; slug: string; brand: string; label: string; icon: IconName; sub: string }[] = [
   { key: "gmail", slug: "gmail", brand: "gmail", label: "Gmail", icon: "mail", sub: "Reads new mail, drafts replies for your OK" },
@@ -14,30 +16,67 @@ const TOOLS: { key: string; slug: string; brand: string; label: string; icon: Ic
   { key: "bank", slug: "", brand: "", label: "Bank and cards", icon: "credit-card", sub: "Not available yet" },
 ];
 
-export default function YouScreen({ serverConnected, onConnect, isPro, onUpgrade, onSignOut }: {
+export default function YouScreen({ settings, onSettings, onUnfiltered, serverConnected, onConnect, isPro, onUpgrade, onSignOut }: {
+  settings: Settings; onSettings: (patch: { personality?: Personality; instructions?: string }) => Promise<boolean>; onUnfiltered: (on: boolean) => void;
   serverConnected: string[]; onConnect: (slug: string) => void; isPro: boolean; onUpgrade: () => void; onSignOut: () => void;
 }) {
-  const connectable = TOOLS.filter((x) => x.slug);
-  const connected = connectable.filter((x) => serverConnected.includes(x.slug)).length;
+  const [instr, setInstr] = useState(settings.instructions);
+  const [focused, setFocused] = useState(false);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { setInstr(settings.instructions); }, [settings.instructions]);
+  const dirty = instr.trim() !== (settings.instructions || "").trim();
+  const connected = TOOLS.filter((x) => x.slug && serverConnected.includes(x.slug)).length;
+
   return (
-    <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <Text style={t.display} accessibilityRole="header">You</Text>
 
-      {isPro ? (
-        <View style={s.proOn}>
-          <Text style={t.headline}>Aura Pro</Text>
-          <Text style={[t.subhead, { marginTop: 2 }]}>Active. Unlimited people and promises, and the daily brief.</Text>
-        </View>
-      ) : (
-        <View style={s.pro}>
-          <Text style={s.proKicker}>Aura Pro</Text>
-          <Text style={s.proTitle}>Keep everyone. Forget nothing.</Text>
-          <Text style={s.proBody}>Unlimited people and promises, plus a daily brief of who needs you. Free for 7 days, then $12 a month.</Text>
-          <Button label="Start free trial" variant="inverse" size="md" onPress={onUpgrade} style={{ alignSelf: "flex-start", marginTop: sp.xl }} />
-        </View>
-      )}
+      <Section title="Personality" meta="How Aura talks to you">
+        {PERSONALITIES.map((p, i) => {
+          const on = settings.personality === p.key;
+          return (
+            <View key={p.key}>
+              {i > 0 ? <Divider /> : null}
+              <Press onPress={() => !on && onSettings({ personality: p.key })} style={s.option} scaleTo={0.99} accessibilityRole="radio" accessibilityLabel={`${p.label}. ${p.line}`}>
+                <View style={[s.radio, on && s.radioOn]}>{on ? <View style={s.radioDot} /> : null}</View>
+                <View style={{ flex: 1 }}>
+                  <Text style={t.label}>{p.label}</Text>
+                  <Text style={[t.footnote, { marginTop: 2 }]}>{p.line}</Text>
+                  {on ? <View style={s.sample}><Text style={t.callout}>{p.sample}</Text></View> : null}
+                </View>
+              </Press>
+            </View>
+          );
+        })}
+      </Section>
 
-      <Section title="Connected apps" meta={`${connected} of ${connectable.length}`}>
+      <Section title="Unfiltered">
+        <View style={s.unfiltered}>
+          <View style={{ flex: 1 }}>
+            <Text style={t.label}>Unfiltered mode</Text>
+            <Text style={[t.callout, { marginTop: 4 }]}>
+              {settings.unfiltered_available
+                ? "Aura answers what you actually ask, mature and controversial topics included, without lectures or disclaimers. Runs on Unblock's open-weight models. For adults only."
+                : "Runs on Unblock's open-weight models, without lectures or disclaimers. Available once Aura is connected to Unblock."}
+            </Text>
+          </View>
+          {settings.unfiltered_available
+            ? <Toggle value={settings.unfiltered} onChange={onUnfiltered} label="Unfiltered mode" />
+            : <Text style={t.caption}>Not connected</Text>}
+        </View>
+      </Section>
+
+      <Section title="Your instructions">
+        <TextInput style={[s.instr, inputReset, focused && { borderColor: c.ink }]} value={instr} onChangeText={setInstr} multiline textAlignVertical="top"
+          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} selectionColor={c.accent} maxLength={1500}
+          placeholder="Call me Ahaan. Keep it short. I work in product, so skip the basics." placeholderTextColor={c.faint} accessibilityLabel="Your instructions for Aura" />
+        {dirty ? (
+          <Button label="Save instructions" size="md" loading={saving} style={{ marginTop: sp.m, alignSelf: "flex-start" }}
+            onPress={async () => { setSaving(true); await onSettings({ instructions: instr }); setSaving(false); }} />
+        ) : null}
+      </Section>
+
+      <Section title="Connected apps" meta={`${connected} connected`}>
         {TOOLS.map((x, i) => {
           const on = !!x.slug && serverConnected.includes(x.slug);
           const can = !!x.slug;
@@ -59,8 +98,14 @@ export default function YouScreen({ serverConnected, onConnect, isPro, onUpgrade
         })}
       </Section>
 
-      <Section title="Memory">
-        <Text style={[t.subhead, { marginTop: sp.s }]}>Aura keeps what you tell it, and what it learns from apps you connect, so it can bring things back at the right moment. Clearing a conversation never erases what Aura remembers.</Text>
+      <Section title="Plan">
+        <View style={s.tool}>
+          <View style={{ flex: 1 }}>
+            <Text style={t.label}>{isPro ? "Aura Pro" : "Free"}</Text>
+            <Text style={[t.footnote, { marginTop: 2 }]}>{isPro ? "Active. Unlimited memory and the daily brief." : "Pro adds unlimited memory and a daily brief. 7 days free, then $12 a month."}</Text>
+          </View>
+          {isPro ? null : <Button label="Try Pro" size="sm" variant="secondary" onPress={onUpgrade} />}
+        </View>
       </Section>
 
       <Section title="Account">
@@ -76,14 +121,16 @@ export default function YouScreen({ serverConnected, onConnect, isPro, onUpgrade
 
 const s = StyleSheet.create({
   scroll: { paddingHorizontal: layout.page, paddingTop: sp.xl, paddingBottom: 56 },
-  pro: { marginTop: sp.xl, backgroundColor: c.accent, borderRadius: r.md, padding: sp.xl },
-  proKicker: { fontFamily: f.medium, fontSize: 13, color: c.onAccentMuted },
-  proTitle: { fontFamily: f.medium, fontSize: 28, lineHeight: 32, letterSpacing: -0.9, color: c.onAccent, marginTop: sp.s },
-  proBody: { fontFamily: f.regular, fontSize: 15, lineHeight: 21, color: c.onAccentMuted, marginTop: sp.m },
-  proOn: { marginTop: sp.xl, paddingVertical: sp.l, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: c.lineStrong },
+  option: { flexDirection: "row", alignItems: "flex-start", gap: 14, paddingVertical: 14 },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: c.control, alignItems: "center", justifyContent: "center", marginTop: 1 },
+  radioOn: { borderColor: c.ink },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: c.ink },
+  sample: { marginTop: sp.m, backgroundColor: c.sunken, borderRadius: r.md, paddingHorizontal: 14, paddingVertical: 10 },
+  unfiltered: { flexDirection: "row", alignItems: "flex-start", gap: sp.l, paddingVertical: 14 },
+  instr: { marginTop: sp.m, minHeight: 96, backgroundColor: c.surface, borderRadius: r.md, borderWidth: 1, borderColor: c.control, padding: 14, fontFamily: f.regular, fontSize: 15.5, lineHeight: 22, color: c.ink },
   tool: { flexDirection: "row", alignItems: "center", gap: 16, paddingVertical: 14 },
   logo: { width: 22, alignItems: "center" },
   on: { flexDirection: "row", alignItems: "center", gap: 5 },
-  onTxt: { fontFamily: f.medium, fontSize: 13.5, color: c.ink },
+  onTxt: { fontFamily: f.medium, fontSize: 13, color: c.ink },
   row: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
 });

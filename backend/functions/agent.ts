@@ -1,8 +1,12 @@
-const SYSTEM = `you are aura, a personal ambient agent with genuine taste and warmth. you talk like a sharp, caring friend, not a corporate bot. keep replies short. emoji sparingly. ALWAYS lowercase. NEVER use em dashes or hyphens as punctuation; use commas or periods.
+// Aura's brain: a personal AI for work and life, with persistent memory, tools for the user's
+// apps, and a personality the user picks.
+const SYSTEM = `you are aura, the user's personal ai. you help run their work and their life: calendar, inbox, tasks, reminders, plans, projects, the people around them, money, health, ideas, and whatever is on their mind. you remember what they tell you and use it without being asked.
 
-you are a real agent with tools. think step by step and use tools to fully handle the request before answering. do not ask the user to do things you can do yourself with a tool.
+voice: you text like a sharp friend, not an assistant. lowercase. short, usually one to three sentences unless they ask for depth. no corporate filler, no "great question", no "as an ai", no bullet-point essays for simple things. NEVER use em dashes or hyphens as punctuation; use commas or periods. emoji rarely.
 
-your relationship graph is your living memory of the people in the user's life and the promises between them. whenever the user mentions a person, a detail about someone, or a commitment (something they owe, or that is owed to them), quietly call remember_person and add_promise so nothing is ever dropped. capture birthdays as MM-DD, and how each person relates to the user (family, friend, client, collaborator, partner) when it is clear. when they ask about someone, want an intro, ask "who do i know that...", or what they owe a person, use recall_people, who_knows, and open_promises. prefer the graph for anything about people or promises.
+you are a real agent with tools. use them to actually handle things before answering. do not ask the user to do something you can do with a tool. when you need a fact about them, check memory first.
+
+memory: whenever they share something durable about themselves, their work, their preferences, plans, routines, or the people in their life, store it (memory_to_store, or remember_person and add_promise for people and commitments). capture birthdays as MM-DD. when they ask about someone or what they owe a person, use recall_people, who_knows, and open_promises.
 
 reads are free: recall_memory, recall_people, who_knows, open_promises, search_inbox, get_calendar, list_tasks, get_context.
 anything outbound is NEVER done silently: you DRAFT or PROPOSE it as a card the user approves. use draft_email for replies and propose for buy/booking/etc.
@@ -29,6 +33,45 @@ tools:
 - propose {"kind":"buy"|"booking", "title": string, "body": string, "payload": object, "urgent"?: boolean}
 
 rules: store only durable facts in memory_to_store, never trivia. keep tool calls minimal and purposeful. when you have enough to answer or have surfaced the right card, finalize.`;
+
+const PERSONALITY: Record<string, string> = {
+  witty: "personality: witty. quick, playful, a little roasty when it lands. you have opinions and share them. tease lightly, never mean. a funny friend who is also very good at their job.",
+  warm: "personality: warm. kind, encouraging, generous. you notice how they are doing and say so. supportive without being saccharine.",
+  blunt: "personality: blunt. no fluff, no softening, no pep talk. say the true thing first, in as few words as possible.",
+  chill: "personality: chill. low-key, unbothered, easy. relaxed phrasing. nothing is urgent unless it truly is.",
+};
+
+// The same deterministic floor UNBLOCK enforces at its gateway (server/trust-safety.ts in
+// Kaeva-labs/unblock-10-5). Checked before any model call; settings cannot disable it.
+const SAFE_REFUSAL = "i can't help with anything that sexualizes kids or helps hurt people like that. that's the one hard line.";
+function illegalRequest(text0: string): boolean {
+  const text = text0.normalize("NFKC").toLowerCase()
+    .replace(/[\p{Cf}\p{Mn}]/gu, "")
+    .replace(/[\p{Cc}\p{Zs}\p{Zl}\p{Zp}]+/gu, " ")
+    .replace(/[-_]/g, " ");
+  if (/^(?:how|where) (?:do|can) i report (?:csam|child pornography|child sexual abuse material)\??$/.test(text.trim())) return false;
+  if (!/\b(create|generate|write|show|give|find|download|share|send|make|provide|produce|how to|help me|where can i)\b/.test(text)) return false;
+  if (/\b(csam|child porn(?:ography)?|child sexual abuse material)\b/.test(text)) return true;
+  if (/\b(child(?:ren)?|minor(?:s)?|underage|preteen|(?:[1-9]|1[0-7])\s*year\s*old)\b/.test(text) &&
+      /\b(porn(?:ography|ographic)?|sexual(?:ly)? explicit|nude(?:s)?|sex scene|erotic)\b/.test(text) &&
+      /\b(create|generate|write|show|give|find|download|share|send|make|produce)\b/.test(text)) return true;
+  if (/\b(how to|instructions|step by step|help me)\b/.test(text) && /\b(rape|sexually assault|traffic children|kidnap a child)\b/.test(text)) return true;
+  return false;
+}
+
+type Settings = { personality: string; instructions: string };
+async function loadSettings(ctx: any, userId: string): Promise<Settings> {
+  try {
+    const r = await ctx.db.query("SELECT personality, instructions FROM user_settings WHERE user_id=$1", [userId]);
+    const row = r.rows[0] || {};
+    return { personality: PERSONALITY[row.personality] ? row.personality : "witty", instructions: String(row.instructions || "").slice(0, 1500) };
+  } catch (e) { return { personality: "witty", instructions: "" }; } // settings table not created yet
+}
+function systemFor(st: Settings): string {
+  const parts = [SYSTEM, PERSONALITY[st.personality] || PERSONALITY.witty];
+  if (st.instructions) parts.push(`the user's own instructions for how you work with them (follow them unless they conflict with the json format): ${st.instructions}`);
+  return parts.join("\n\n");
+}
 
 function json(d: any, s = 200): Response {
   return new Response(JSON.stringify(d), { status: s, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
@@ -113,6 +156,12 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
     }
 
     if (source !== "system") await ctx.db.query("INSERT INTO messages (user_id, role, content, kind) VALUES ($1,'user',$2,$3)", [userId, text, source]);
+
+    if (illegalRequest(text)) {
+      const fm = await ctx.db.query("INSERT INTO messages (user_id, role, content, kind) VALUES ($1,'aura',$2,'chat') RETURNING *", [userId, SAFE_REFUSAL]);
+      return json({ reply: SAFE_REFUSAL, steps: [], card: null, message: fm.rows[0] });
+    }
+    const settings = await loadSettings(ctx, userId);
 
     const hist = await ctx.db.query("SELECT role, content FROM messages WHERE user_id=$1 AND kind IN ('chat','agent') ORDER BY created_at DESC LIMIT 6", [userId]);
     const histMsgs = hist.rows.reverse().map((m: any) => ({ role: m.role === "user" ? "user" : "assistant", content: String(m.content || "").slice(0, 500) }));
@@ -220,7 +269,7 @@ export default async function handler(req: Request, ctx: any): Promise<Response>
       } catch (e: any) { return "tool error: " + String(e).slice(0, 120); }
     }
 
-    const convo: any[] = [{ role: "system", content: SYSTEM }, ...histMsgs, { role: "user", content: text }];
+    const convo: any[] = [{ role: "system", content: systemFor(settings) }, ...histMsgs, { role: "user", content: text }];
     let finalReply = "", toStore: string[] = [];
     for (let i = 0; i < 6; i++) {
       const out = await ai(API, APP, KEY, convo);

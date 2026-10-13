@@ -5,6 +5,7 @@ import { useAudioRecorder, AudioModule, RecordingPresets, setAudioModeAsync } fr
 import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import { transcribe } from "../lib/api";
+import { toast } from "../lib/toast";
 import { c } from "../theme";
 
 // Tap to dictate, tap again to transcribe into the field. While recording the button turns
@@ -47,7 +48,7 @@ export default function MicButton({
     if (!recording) {
       try {
         const perm = await AudioModule.requestRecordingPermissionsAsync();
-        if (!perm.granted) return;
+        if (!perm.granted) { toast("Allow microphone access for Aura in Settings to dictate."); return; }
         await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
         await recorder.prepareToRecordAsync();
         recorder.record();
@@ -72,7 +73,7 @@ export default function MicButton({
           if (text) onResult(text);
         }
       } catch (e) {
-        /* ignore */
+        toast("Couldn't transcribe that. Try again.");
       } finally {
         setWorking(false);
       }
@@ -94,7 +95,7 @@ export default function MicButton({
         borderRadius: size / 2,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: recording ? c.signalTint : "transparent",
+        backgroundColor: recording ? c.accentTint : "transparent",
         borderWidth: !inline && !recording ? 1 : 0,
         borderColor: c.lineStrong,
         opacity: disabled ? 0.4 : 1,
@@ -105,7 +106,7 @@ export default function MicButton({
       ) : (
         <Animated.View style={{ transform: [{ scale: Animated.multiply(pulse, press) }] }}>
           {recording
-            ? <Animated.View style={{ width: size * 0.3, height: size * 0.3, borderRadius: 3, backgroundColor: c.signal }} />
+            ? <Animated.View style={{ width: size * 0.3, height: size * 0.3, borderRadius: 3, backgroundColor: c.accent }} />
             : <Feather name="mic" size={Math.round(size * 0.45)} color={c.ink2} />}
         </Animated.View>
       )}

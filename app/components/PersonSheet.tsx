@@ -50,7 +50,7 @@ export default function PersonSheet({ person, onClose, onAct }: { person: GraphP
             {facts.map(([k, v]) => (
               <View key={k} style={s.fact}>
                 <Text style={s.key}>{k}</Text>
-                <Text style={[s.val, k === "Birthday" && bd !== null && bd <= 7 && { color: c.signalText }]}>{v}</Text>
+                <Text style={[s.val, k === "Birthday" && bd !== null && bd <= 7 && { color: c.accentText }]}>{v}</Text>
               </View>
             ))}
           </View>

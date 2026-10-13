@@ -90,7 +90,7 @@ export default function CaptureMoment({ visible, onClose, onCaptured }: { visibl
         {phase === "idle" && (
           <View style={s.body}>
             <View style={{ flex: 1, justifyContent: "center" }}>
-              <Text style={t.display}>Talk. Aura takes the notes.</Text>
+              <Text style={t.display}>Aura will take the notes.</Text>
               <Text style={[t.callout, { marginTop: sp.m }]}>Who was there, what's new with them, and anything you promised, filed into their records when you stop.</Text>
               <Text style={[t.footnote, { marginTop: sp.xl }]}>Let people know before you start recording.</Text>
             </View>
@@ -165,10 +165,10 @@ const s = StyleSheet.create({
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 48, paddingBottom: 24 },
   recWrap: { alignItems: "center", paddingBottom: sp.l },
   recBtn: { width: 80, height: 80, borderRadius: 40, borderWidth: 2, borderColor: c.ink, alignItems: "center", justifyContent: "center" },
-  recDot: { width: 60, height: 60, borderRadius: 30, backgroundColor: c.signal },
+  recDot: { width: 60, height: 60, borderRadius: 30, backgroundColor: c.accent },
   live: { flexDirection: "row", alignItems: "center", gap: 7 },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.signal },
-  liveTxt: { fontFamily: f.medium, fontSize: 14, color: c.signalText },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.accent },
+  liveTxt: { fontFamily: f.medium, fontSize: 14, color: c.accentText },
   timer: { fontFamily: f.medium, fontSize: 76, letterSpacing: -3, color: c.ink, marginTop: sp.s, fontVariant: ["tabular-nums"] },
   wave: { flexDirection: "row", alignItems: "center", gap: 3, height: 72, marginTop: sp.xxl },
   waveBar: { flex: 1, borderRadius: 1, backgroundColor: c.ink },

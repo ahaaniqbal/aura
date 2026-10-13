@@ -4,18 +4,19 @@ import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 import Mark, { Wordmark } from "./Mark";
 import MicButton from "./MicButton";
-import Avatar from "./Avatar";
-import { Button, EASE_OUT, IconButton } from "./ui";
+import { Button, Divider, EASE_OUT, IconButton, Press } from "./ui";
 import { c, f, inputReset, r, sp, t } from "../theme";
-import { addNote, agent, getGraph } from "../lib/api";
+import { addNote, agent, getFeed, Personality, saveSettings } from "../lib/api";
+import { PERSONALITIES } from "../lib/personality";
 
-// First run. It opens and closes on cobalt, Aura's own color; the two questions in between are
-// plain and quiet so the typing is the focus. The payoff is your circle, named back to you.
-export default function Onboarding({ onDone }: { onDone: () => void }) {
+// First run. Opens and closes on vermilion, Aura's own color; the questions in between are plain
+// so the typing is the focus. The payoff is Aura showing back what it already knows about you.
+export default function Onboarding({ onDone, initialName }: { onDone: () => void; initialName?: string }) {
   const [step, setStep] = useState(0);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initialName || "");
+  const [personality, setPersonality] = useState<Personality>("witty");
   const [seed, setSeed] = useState("");
-  const [people, setPeople] = useState<string[]>([]);
+  const [known, setKnown] = useState<string[]>([]);
   const [failed, setFailed] = useState(false);
   const fade = useRef(new Animated.Value(0)).current;
 
@@ -25,26 +26,33 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   }, [step]);
 
   const go = (n: number) => { Haptics.selectionAsync().catch(() => {}); setStep(n); };
+  const start = () => go(initialName ? 2 : 1);
   const saveName = () => { const n = name.trim(); if (n) addNote(`my name is ${n}`).catch(() => {}); go(2); };
+  const savePersonality = () => { saveSettings({ personality }).catch(() => {}); go(3); };
   const captureSeed = async () => {
     const text = seed.trim();
-    if (!text) { go(4); return; }
+    if (!text) { go(5); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    setStep(3); setFailed(false);
-    try { await agent(text, "onboarding"); const g = await getGraph(); setPeople((g.people || []).map((p) => p.person).filter(Boolean)); }
-    catch (e) { setFailed(true); } finally { setStep(4); }
+    setStep(4); setFailed(false);
+    try {
+      await agent(text, "onboarding");
+      const fd = await getFeed();
+      setKnown((fd.memories || []).filter((m) => m.kind !== "task" && !/^my name is/i.test(m.text)).map((m) => m.text).slice(0, 5));
+    } catch (e) { setFailed(true); } finally { setStep(5); }
   };
   const finish = () => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); onDone(); };
   const firstName = name.trim().split(" ")[0];
-  const brand = step === 0 || step === 4;
+  const brand = step === 0 || step === 5;
+  const qSteps = initialName ? [2, 3] : [1, 2, 3];
+  const qIndex = qSteps.indexOf(step);
 
   return (
     <SafeAreaView style={[s.root, brand && { backgroundColor: c.accent }]}>
-      <StatusBar style={brand ? "light" : "dark"} />
-      {step === 1 || step === 2 ? (
+      <StatusBar style="dark" />
+      {qIndex >= 0 ? (
         <View style={s.nav}>
-          <IconButton icon="chevron-left" size={36} variant="plain" onPress={() => go(step - 1)} label="Back" />
-          <Text style={t.caption}>{step} of 2</Text>
+          <IconButton icon="chevron-left" size={36} variant="plain" onPress={() => go(qIndex === 0 ? 0 : qSteps[qIndex - 1])} label="Back" />
+          <Text style={t.caption}>{qIndex + 1} of {qSteps.length}</Text>
           <View style={{ width: 36 }} />
         </View>
       ) : null}
@@ -53,13 +61,13 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
 
           {step === 0 && (
             <View style={s.page}>
-              <View style={{ paddingTop: sp.l }}><Wordmark color={c.onAccent} /></View>
+              <View style={{ paddingTop: sp.l }}><Wordmark /></View>
               <View style={{ flex: 1, justifyContent: "flex-end", paddingBottom: sp.h }}>
                 <Preview />
-                <Text style={[t.display, s.onBrand, { marginTop: sp.h }]}>Remember the people who matter.</Text>
-                <Text style={[t.callout, { color: c.onAccentMuted, marginTop: sp.m }]}>Birthdays, promises, what they're going through. Aura keeps it and tells you when it counts.</Text>
+                <Text style={[t.display, { marginTop: sp.h }]}>One AI for your work and your life.</Text>
+                <Text style={[t.callout, { color: c.onAccentMuted, marginTop: sp.m }]}>It remembers what you tell it, keeps an eye on your inbox and calendar, and handles the rest with your OK.</Text>
               </View>
-              <Button label="Get started" variant="inverse" onPress={() => go(1)} />
+              <Button label="Get started" onPress={start} />
             </View>
           )}
 
@@ -71,59 +79,82 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                   autoCapitalize="words" autoFocus returnKeyType="next" onSubmitEditing={saveName} selectionColor={c.accent} accessibilityLabel="Your first name" />
               </View>
               <Button label="Continue" onPress={saveName} disabled={!name.trim()} />
-              <Button label="Skip" variant="ghost" onPress={() => go(2)} style={{ marginTop: sp.xs }} />
             </View>
           )}
 
           {step === 2 && (
+            <ScrollView contentContainerStyle={s.scrollPage}>
+              <View style={{ flex: 1, paddingTop: sp.xl }}>
+                <Text style={t.title1}>{firstName ? `How should Aura talk to you, ${firstName}?` : "How should Aura talk to you?"}</Text>
+                <Text style={[t.callout, { marginTop: sp.s }]}>Same help, different voice. You can change it anytime.</Text>
+                <View style={s.options}>
+                  {PERSONALITIES.map((p, i) => {
+                    const on = personality === p.key;
+                    return (
+                      <View key={p.key}>
+                        {i > 0 ? <Divider /> : null}
+                        <Press onPress={() => setPersonality(p.key)} style={s.option} scaleTo={0.99} accessibilityRole="radio" accessibilityLabel={`${p.label}. ${p.line}`}>
+                          <View style={[s.radio, on && s.radioOn]}>{on ? <View style={s.radioDot} /> : null}</View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={t.label}>{p.label}</Text>
+                            <Text style={[t.footnote, { marginTop: 2 }]}>{p.line}</Text>
+                            {on ? <View style={s.sample}><Text style={t.callout}>{p.sample}</Text></View> : null}
+                          </View>
+                        </Press>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+              <Button label="Continue" onPress={savePersonality} style={{ marginTop: sp.xl }} />
+            </ScrollView>
+          )}
+
+          {step === 3 && (
             <ScrollView contentContainerStyle={s.scrollPage} keyboardShouldPersistTaps="handled">
               <View style={{ flex: 1, paddingTop: sp.xl }}>
-                <Text style={t.title1}>{firstName ? `Who matters most to you, ${firstName}?` : "Who matters most to you?"}</Text>
-                <Text style={[t.callout, { marginTop: sp.s }]}>Write it the way you'd tell a friend: how you know them, birthdays, anything you owe them.</Text>
+                <Text style={t.title1}>What's on your plate?</Text>
+                <Text style={[t.callout, { marginTop: sp.s }]}>Your work, your week, the people around you, what you're trying to get done. Anything Aura should know.</Text>
                 <View style={s.letter}>
                   <TextInput style={[s.letterInput, inputReset]} value={seed} onChangeText={setSeed} multiline textAlignVertical="top" autoFocus selectionColor={c.accent}
-                    placeholder="My sister Priya, birthday in March. I owe her a book. Mike from work, he's into film." placeholderTextColor={c.faint} accessibilityLabel="People who matter to you" />
+                    placeholder="I run product at a 20 person startup. Launch is on the 28th. Training for a half marathon. My sister Priya's birthday is in March." placeholderTextColor={c.faint} accessibilityLabel="What's on your plate" />
                   <View style={s.letterFoot}>
                     <Text style={[t.footnote, { flex: 1 }]}>Or dictate it</Text>
                     <MicButton onResult={(x) => setSeed((d) => (d ? d + " " + x : x))} size={36} />
                   </View>
                 </View>
               </View>
-              <Button label="Add them" onPress={captureSeed} disabled={!seed.trim()} style={{ marginTop: sp.xl }} />
-              <Button label="Do this later" variant="ghost" onPress={() => go(4)} style={{ marginTop: sp.xs }} />
+              <Button label="Continue" onPress={captureSeed} disabled={!seed.trim()} style={{ marginTop: sp.xl }} />
+              <Button label="Skip for now" variant="ghost" onPress={() => go(5)} style={{ marginTop: sp.xs }} />
             </ScrollView>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <View style={[s.page, { justifyContent: "center" }]}>
-              <Mark size={40} state="thinking" />
-              <Text style={[t.title1, { marginTop: sp.xl }]}>Reading about your people</Text>
-              <Text style={[t.callout, { marginTop: 6 }]}>Names, birthdays and promises, filed one by one.</Text>
+              <Mark size={44} state="thinking" />
+              <Text style={[t.title1, { marginTop: sp.l }]}>Getting to know you</Text>
+              <Text style={[t.callout, { marginTop: 6 }]}>Picking out what's worth remembering.</Text>
             </View>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <ScrollView contentContainerStyle={s.scrollPage}>
               <View style={{ flex: 1, justifyContent: "center", paddingVertical: sp.h }}>
-                {people.length ? (
+                <Text style={t.display}>{firstName ? `Aura's ready, ${firstName}.` : "Aura's ready."}</Text>
+                {known.length ? (
                   <>
-                    <Text style={[t.caption, { color: c.onAccentMuted }]}>Your circle</Text>
-                    <View style={{ marginTop: sp.m }}>
-                      {people.slice(0, 7).map((p) => <Text key={p} style={[t.display, s.onBrand]}>{p}</Text>)}
-                      {people.length > 7 ? <Text style={[t.title2, { color: c.onAccentMuted, marginTop: sp.s }]}>and {people.length - 7} more</Text> : null}
+                    <Text style={[t.caption, { color: c.onAccentMuted, marginTop: sp.xl }]}>What it knows so far</Text>
+                    <View style={s.known}>
+                      {known.map((k, i) => <Text key={i} style={[t.body, s.knownItem, i > 0 && s.knownSep]}>{k}</Text>)}
                     </View>
-                    <Text style={[t.callout, { color: c.onAccentMuted, marginTop: sp.xxl }]}>Aura will tell you before their birthdays and when you owe them something.</Text>
                   </>
                 ) : (
-                  <>
-                    <Text style={[t.display, s.onBrand]}>{failed ? "Let's finish this inside." : "You're set."}</Text>
-                    <Text style={[t.callout, { color: c.onAccentMuted, marginTop: sp.m }]}>{failed
-                      ? "That didn't save. Tell Aura about your people from the Ask tab whenever you're ready."
-                      : "Tell Aura about someone whenever they come to mind. It will remember for you."}</Text>
-                  </>
+                  <Text style={[t.callout, { color: c.onAccentMuted, marginTop: sp.m }]}>{failed
+                    ? "That didn't save. Tell Aura about yourself in the chat whenever you're ready."
+                    : "Talk to it about anything. The more it knows, the less you have to explain."}</Text>
                 )}
               </View>
-              <Button label="Open Aura" variant="inverse" onPress={finish} />
+              <Button label="Start talking" onPress={finish} />
             </ScrollView>
           )}
 
@@ -133,22 +164,15 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   );
 }
 
-// A real slice of the product on the welcome screen: the reminders Aura actually surfaces.
+// A real slice of the product: one question, one answer that covers work and life.
 function Preview() {
-  const rows = [
-    { name: "Priya Shah", text: "Priya's birthday", meta: "Thursday" },
-    { name: "Mike Chen", text: "Lend Mike The Power Broker", meta: "Overdue", signal: true },
-    { name: "Sam Ortiz", text: "Reconnect with Sam", meta: "5 weeks" },
-  ];
   return (
     <View style={s.preview}>
-      {rows.map((x, i) => (
-        <View key={x.name} style={[s.previewRow, i > 0 && s.previewSep]}>
-          <Avatar name={x.name} size={32} signal={x.signal} />
-          <Text style={[t.label, { flex: 1 }]} numberOfLines={1}>{x.text}</Text>
-          <Text style={[t.caption, x.signal && { color: c.signalText }]}>{x.meta}</Text>
-        </View>
-      ))}
+      <View style={s.pUser}><Text style={t.body}>anything i'm forgetting today?</Text></View>
+      <View style={s.pAura}>
+        <Mark size={22} />
+        <Text style={[t.body, { flex: 1 }]}>your 2pm moved to 3. dana needs a yes on the venue by 5, i drafted it. and it's mike's birthday tomorrow, he's been eyeing an espresso grinder.</Text>
+      </View>
     </View>
   );
 }
@@ -156,15 +180,23 @@ function Preview() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: c.canvas },
   fill: { flex: 1 },
-  onBrand: { color: c.onAccent },
   nav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingTop: 6 },
   page: { flex: 1, paddingHorizontal: 24, paddingBottom: 20 },
   scrollPage: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 20 },
   nameInput: { fontFamily: f.medium, fontSize: 32, letterSpacing: -1, color: c.ink, marginTop: sp.h, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.ink },
-  letter: { backgroundColor: c.surface, borderRadius: r.md, borderWidth: 1, borderColor: c.lineStrong, padding: sp.l, marginTop: sp.xxl },
+  options: { marginTop: sp.xl, borderTopWidth: 1, borderTopColor: c.ink },
+  option: { flexDirection: "row", alignItems: "flex-start", gap: 14, paddingVertical: 14 },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: c.control, alignItems: "center", justifyContent: "center", marginTop: 1 },
+  radioOn: { borderColor: c.ink },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: c.ink },
+  sample: { marginTop: sp.m, backgroundColor: c.sunken, borderRadius: r.md, paddingHorizontal: 14, paddingVertical: 10 },
+  letter: { backgroundColor: c.surface, borderRadius: r.md, borderWidth: 1, borderColor: c.control, padding: sp.l, marginTop: sp.xxl },
   letterInput: { fontFamily: f.regular, fontSize: 17, lineHeight: 25, color: c.ink, minHeight: 150, padding: 0 },
   letterFoot: { flexDirection: "row", alignItems: "center", marginTop: sp.m, paddingTop: sp.m, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
-  preview: { backgroundColor: c.surface, borderRadius: r.md },
-  previewRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  previewSep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
+  preview: { backgroundColor: c.surface, borderRadius: r.md, padding: sp.l, gap: sp.m },
+  pUser: { alignSelf: "flex-end", maxWidth: "86%", backgroundColor: c.sunken, borderRadius: r.md, paddingHorizontal: 14, paddingVertical: 10 },
+  pAura: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  known: { marginTop: sp.s, borderTopWidth: 1, borderTopColor: c.ink },
+  knownItem: { paddingVertical: 11 },
+  knownSep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(13,14,18,0.25)" },
 });

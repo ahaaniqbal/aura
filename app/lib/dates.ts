@@ -65,3 +65,18 @@ export function capitalize(s: string): string {
   const v = String(s || "");
   return v ? v[0].toUpperCase() + v.slice(1) : v;
 }
+
+// The "when" column for a reminder. Under a Today or Tomorrow heading the day is already said,
+// so show the time instead; elsewhere today's items show their time and later ones their day.
+export function reminderWhen(r: { due_at: string; label: string; bucket: string }, grouped = false): string {
+  const d = new Date(r.due_at);
+  const time = isNaN(d.getTime()) ? "" : clock(d);
+  if (r.bucket === "today") return time || (grouped ? "" : "Today");
+  if (r.bucket === "tomorrow") return grouped ? time : "Tomorrow";
+  return capitalize(r.label);
+}
+
+function clock(d: Date): string {
+  const h = d.getHours(), m = d.getMinutes();
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`;
+}

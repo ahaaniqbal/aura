@@ -2,80 +2,97 @@ import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Avatar from "../components/Avatar";
-import PulseCard from "../components/PulseCard";
 import ActionCard from "../components/ActionCard";
-import { Button, Divider, Empty, IconButton, Press, Section, Status } from "../components/ui";
+import { Button, Divider, Empty, LinkButton, Press, Section, Status } from "../components/ui";
 import { c, f, layout, r, sp, t, Tone, toneColor } from "../theme";
 import { contactStats, isDrifting, warmth } from "../lib/weight";
-import { capitalize, daysUntilBirthday, dueMeta, inDays, todayLabel } from "../lib/dates";
-import type { Card as ActionItem, GraphPerson, PromiseItem, Pulse } from "../lib/api";
+import { capitalize, daysUntilBirthday, dueMeta, inDays, reminderWhen, todayLabel } from "../lib/dates";
+import type { Card as ActionItem, GraphPerson, PlaceReminder, PromiseItem, Reminder } from "../lib/api";
 
 type Nudge = { key: string; person: string | null; title: string; label: string; tone: Tone; body: string; rank: number; promise?: string };
 
-function firstName(n: string) { return String(n || "").split(" ")[0]; }
-function namesSentence(names: string[]): string {
-  if (!names.length) return "Nothing needs you today.";
-  if (names.length === 1) return `${names[0]} needs you today.`;
-  if (names.length === 2) return `${names[0]} and ${names[1]} need you today.`;
-  if (names.length === 3) return `${names[0]}, ${names[1]} and ${names[2]} need you today.`;
-  return `${names[0]}, ${names[1]} and ${names.length - 2} others need you today.`;
+const firstName = (n: string) => String(n || "").split(" ")[0];
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+function joinList(xs: string[]): string {
+  if (xs.length <= 1) return xs.join("");
+  return `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 }
 
-export default function TodayScreen({ promises, people, pulse, onPulse, approvals, onAct, onEdit, busy, onAsk, onDone, onBrief, onRecord, onOpenPerson, status, statusTone }: {
-  promises: PromiseItem[]; people: GraphPerson[]; pulse: Pulse | null; onPulse: (v: number, mood: string) => void;
-  approvals: ActionItem[]; onAct: (c: ActionItem, d: "approve" | "decline") => void; onEdit: (c: ActionItem) => void; busy: boolean;
-  onAsk: () => void; onDone: (text: string) => void; onBrief: () => void; onRecord: () => void; onOpenPerson: (name: string) => void;
-  status: string; statusTone: Tone;
+// The brief for work and life: what's waiting for your OK, what's on your plate, and who could
+// use you. It leads with a sentence, not a dashboard.
+export default function TodayScreen({ loaded, approvals, onAct, onEdit, busy, scheduled, places, onReminderDone, promises, people, onDone, onOpenPerson, onAsk, onRecord, onBrief, status, statusTone }: {
+  loaded: boolean; approvals: ActionItem[]; onAct: (c: ActionItem, d: "approve" | "decline") => void; onEdit: (c: ActionItem) => void; busy: boolean;
+  scheduled: Reminder[]; places: PlaceReminder[]; onReminderDone: (id: string) => void;
+  promises: PromiseItem[]; people: GraphPerson[]; onDone: (text: string) => void; onOpenPerson: (name: string) => void;
+  onAsk: () => void; onRecord: () => void; onBrief: () => void; status: string; statusTone: Tone;
 }) {
+  const plate = scheduled.filter((x) => x.bucket === "today" || x.bucket === "tomorrow");
+
   const pN: Nudge[] = promises.map((p) => {
     const meta = dueMeta(p.due);
     const who = p.person || null;
     return {
       key: "p:" + p.text + (p.person || ""), person: who, title: capitalize(p.text), promise: p.text,
-      label: meta ? meta.label : "Open", tone: meta?.tone === "over" ? "signal" : meta?.tone === "soon" ? "neutral" : "muted",
-      body: p.direction === "owed_to_me" ? `${who || "Someone"} owes you` : `Promised to ${who || "someone"}`,
-      rank: meta ? meta.rank : 9999,
+      label: meta ? meta.label : "Open", tone: meta?.tone === "over" ? "accent" : meta?.tone === "soon" ? "neutral" : "muted",
+      body: p.direction === "owed_to_me" ? `${who || "Someone"} owes you` : `Promised to ${who || "someone"}`, rank: meta ? meta.rank : 9999,
     };
   });
-  const bN: Nudge[] = people.map((p) => ({ p, d: daysUntilBirthday(p.birthday) })).filter((x) => x.d !== null && (x.d as number) <= 21).map(({ p, d }) => {
+  const bN: Nudge[] = people.map((p) => ({ p, d: daysUntilBirthday(p.birthday) })).filter((x) => x.d !== null && (x.d as number) <= 14).map(({ p, d }) => {
     const days = d as number;
-    const wants = (p.wants || []).filter(Boolean);
-    return { key: "b:" + p.person, person: p.person, title: `${firstName(p.person)}'s birthday`, label: inDays(days), tone: days <= 3 ? "signal" : "neutral",
-      body: wants.length ? `Would love ${wants.slice(0, 2).join(" or ")}` : (p.relation ? `Your ${p.relation}` : ""), rank: days };
+    const wants = (p.wants || []).filter(Boolean).map((w) => w.charAt(0).toLowerCase() + w.slice(1));
+    return { key: "b:" + p.person, person: p.person, title: `${firstName(p.person)}'s birthday`, label: inDays(days), tone: days <= 3 ? "accent" : "neutral",
+      body: wants.length ? `Would love ${wants.slice(0, 2).join(" or ")}` : "", rank: days };
   });
   const cN: Nudge[] = people.filter((p) => p.care && p.care_at && (Date.now() - Number(p.care_at) < 30 * 86400000)).slice(0, 3).map((p) => ({
-    key: "c:" + p.person, person: p.person, title: `Check in on ${firstName(p.person)}`, label: "On their mind", tone: "signal", body: String(p.care || ""), rank: -12,
+    key: "c:" + p.person, person: p.person, title: `Check in on ${firstName(p.person)}`, label: "On their mind", tone: "accent", body: String(p.care || ""), rank: -12,
   }));
-  // gently resurface people you've drifted from, so no one important goes quiet
   const surfaced = new Set([...cN, ...pN, ...bN].map((n) => String(n.person || "").toLowerCase()));
   const rN: Nudge[] = people.filter((p) => !surfaced.has(String(p.person).toLowerCase()) && isDrifting(p))
     .sort((a, b) => warmth(a) - warmth(b)).slice(0, 2).map((p) => {
       const st = contactStats(p);
-      const body = st.cadenceLabel ? `You usually talk ${st.cadenceLabel}. Last was ${st.lastLabel}.` : st.overdueWeeks ? `${st.overdueWeeks} weeks since you caught up` : "You've gone quiet";
-      return { key: "r:" + p.person, person: p.person, title: `Reconnect with ${firstName(p.person)}`, label: "Drifting", tone: "muted", body, rank: 6 };
+      return { key: "r:" + p.person, person: p.person, title: `Reconnect with ${firstName(p.person)}`, label: "It's been a while", tone: "muted",
+        body: st.lastLabel ? `Last spoke ${st.lastLabel}` : "", rank: 6 };
     });
-  const nudges = [...cN, ...rN, ...pN, ...bN].sort((a, b) => a.rank - b.rank).slice(0, 6);
-  const names = Array.from(new Set(nudges.map((n) => n.person).filter(Boolean).map((n) => firstName(n as string))));
-  const headline = names.length ? namesSentence(names) : approvals.length ? `${approvals.length} ${approvals.length === 1 ? "reply is" : "replies are"} waiting for you.` : namesSentence([]);
+  const nudges = [...cN, ...rN, ...pN, ...bN].sort((a, b) => a.rank - b.rank).slice(0, 5);
+
+  // one sentence that says what kind of day it is, then the rest as a quieter line
+  const parts: string[] = [];
+  if (approvals.length) parts.push(`${plural(approvals.length, "reply is", "replies are")} waiting for your OK`);
+  const onPlate = plate.length + places.length;
+  if (onPlate) parts.push(`${plural(onPlate, "thing", "things")} on your plate`);
+  if (nudges.length) parts.push(`${plural(nudges.length, "person", "people")} could use you`);
+  const headline = parts.length ? capitalize(parts[0]) + "." : "Nothing needs you right now.";
+  const rest = parts.slice(1);
 
   return (
-    <ScrollView style={s.fill} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <ScrollView style={s.fill} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
       <View style={s.top}>
         <Text style={t.caption}>{todayLabel()}</Text>
         <Status label={status} tone={statusTone} dot />
       </View>
-      <Text style={[t.display, { marginTop: sp.l }]} accessibilityRole="header">{headline}</Text>
-      {names.length && approvals.length ? (
-        <Text style={[t.callout, { marginTop: sp.s }]}>{approvals.length} {approvals.length === 1 ? "reply is" : "replies are"} waiting for your OK.</Text>
-      ) : null}
+      {loaded ? (
+        <>
+          <Text style={[t.display, { marginTop: sp.l }]} accessibilityRole="header">{headline}</Text>
+          {rest.length ? <Text style={[t.callout, { marginTop: sp.s }]}>Also {joinList(rest)}.</Text> : null}
+        </>
+      ) : (
+        <View style={{ marginTop: sp.l, gap: 10 }} accessibilityLabel="Loading your day">
+          <View style={[s.skel, { height: 34, width: "88%" }]} />
+          <View style={[s.skel, { height: 34, width: "56%" }]} />
+        </View>
+      )}
 
-      <View style={s.askRow}>
-        <Press onPress={onAsk} style={s.ask} scaleTo={0.99} accessibilityLabel="Tell Aura something">
-          <Text style={s.askTxt}>Tell Aura something</Text>
-          <Feather name="arrow-up-right" size={17} color={c.muted} />
+      <View style={s.quick}>
+        <Press onPress={onAsk} style={s.ask} scaleTo={0.99} accessibilityLabel="Message Aura">
+          <Text style={s.askTxt}>Message Aura</Text>
+          <Feather name="arrow-up" size={17} color={c.ink2} />
         </Press>
-        <IconButton icon="mic" size={50} onPress={onRecord} label="Record a conversation" style={{ borderRadius: r.md }} />
+        <Press onPress={onRecord} style={s.record} scaleTo={0.97} accessibilityLabel="Record a conversation">
+          <View style={s.recDot} />
+          <Text style={t.label}>Record</Text>
+        </Press>
       </View>
+      <LinkButton label="Get my brief" icon="sun" onPress={onBrief} style={{ marginTop: sp.s }} />
 
       {approvals.length ? (
         <Section title="Waiting for your OK" meta={String(approvals.length)}>
@@ -83,15 +100,30 @@ export default function TodayScreen({ promises, people, pulse, onPulse, approval
         </Section>
       ) : null}
 
-      <Section title="Who needs you" action="Daily brief" onAction={onBrief}>
-        {nudges.length ? nudges.map((n, i) => (
+      {loaded && (plate.length || places.length) ? (
+        <Section title="On your plate" meta={String(plate.length + places.length)}>
+          {[...plate.map((x) => ({ id: x.id, when: reminderWhen(x), text: x.text })), ...places.map((x) => ({ id: x.id, when: x.place, text: x.text }))].map((x, i) => (
+            <View key={x.id}>
+              {i > 0 ? <Divider /> : null}
+              <View style={s.item}>
+                <Text style={s.when} numberOfLines={2}>{x.when}</Text>
+                <Text style={[t.body, { flex: 1 }]}>{x.text}</Text>
+                <Press onPress={() => onReminderDone(x.id)} hitSlop={8} scaleTo={0.9} style={s.check} accessibilityRole="checkbox" accessibilityLabel={`Mark done: ${x.text}`} />
+              </View>
+            </View>
+          ))}
+        </Section>
+      ) : null}
+
+      <Section title="Your people">
+        {!loaded ? <SkeletonRows /> : nudges.length ? nudges.map((n, i) => (
           <View key={n.key}>
             {i > 0 ? <Divider inset={56} /> : null}
             <Press onPress={() => n.person && onOpenPerson(n.person)} disabled={!n.person} style={s.row} scaleTo={0.99} accessibilityLabel={`${n.title}. ${n.label}`}>
-              <Avatar name={n.person || "?"} size={40} signal={n.tone === "signal"} />
+              <Avatar name={n.person || "?"} size={40} signal={n.tone === "accent"} />
               <View style={{ flex: 1 }}>
                 <Text style={t.label}>{n.title}</Text>
-                <Text style={[t.subhead, { marginTop: 3 }]} numberOfLines={2}>
+                <Text style={[t.callout, { marginTop: 3 }]} numberOfLines={2}>
                   <Text style={{ fontFamily: f.medium, color: toneColor[n.tone] }}>{n.label}</Text>
                   {n.body ? `  ${n.body}` : ""}
                 </Text>
@@ -100,14 +132,26 @@ export default function TodayScreen({ promises, people, pulse, onPulse, approval
             </Press>
           </View>
         )) : (
-          <Empty title="This is where people show up" body="A birthday a few days out, a promise coming due, a friend gone quiet. Aura puts them here the day they need you." />
+          <Empty title="No one's waiting on you" body="Mention a birthday, a promise or a friend you haven't seen in a while, and Aura brings them back here at the right time." />
         )}
       </Section>
-
-      <Section title="Your week">
-        <PulseCard pulse={pulse} onPulse={onPulse} />
-      </Section>
     </ScrollView>
+  );
+}
+
+function SkeletonRows() {
+  return (
+    <View accessibilityLabel="Loading">
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={[s.row, { opacity: 1 - i * 0.25 }]}>
+          <View style={[s.skel, { width: 40, height: 40, borderRadius: 20 }]} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <View style={[s.skel, { height: 12, width: "60%" }]} />
+            <View style={[s.skel, { height: 10, width: "80%" }]} />
+          </View>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -115,8 +159,14 @@ const s = StyleSheet.create({
   fill: { flex: 1 },
   scroll: { paddingHorizontal: layout.page, paddingTop: sp.m, paddingBottom: 56 },
   top: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: sp.m },
-  askRow: { flexDirection: "row", gap: sp.s, marginTop: sp.xxl },
-  ask: { flex: 1, height: 50, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, borderRadius: r.md, borderWidth: 1, borderColor: c.lineStrong, backgroundColor: c.surface },
-  askTxt: { fontFamily: f.regular, fontSize: 16, color: c.muted },
+  skel: { backgroundColor: c.sunken, borderRadius: r.xs },
+  quick: { flexDirection: "row", gap: sp.s, marginTop: sp.xxl },
+  ask: { flex: 1, height: 50, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, borderRadius: r.md, borderWidth: 1, borderColor: c.control, backgroundColor: c.surface },
+  askTxt: { fontFamily: f.regular, fontSize: 16, color: c.faint },
+  record: { height: 50, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, borderRadius: r.md, borderWidth: 1, borderColor: c.control },
+  recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: c.accent },
   row: { flexDirection: "row", alignItems: "center", gap: 16, paddingVertical: 14 },
+  item: { flexDirection: "row", alignItems: "flex-start", gap: 14, paddingVertical: 13 },
+  when: { width: 76, fontFamily: f.medium, fontSize: 14, lineHeight: 23, color: c.ink2 },
+  check: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: c.control },
 });

@@ -4,12 +4,11 @@ import { Feather } from "@expo/vector-icons";
 import { c, f } from "../theme";
 import type { IconName } from "./ui";
 
-export type TabKey = "today" | "ask" | "people" | "notes" | "you";
+export type TabKey = "aura" | "today" | "memory" | "you";
 export const TABS: { key: TabKey; icon: IconName; label: string }[] = [
+  { key: "aura", icon: "message-circle", label: "Aura" },
   { key: "today", icon: "sun", label: "Today" },
-  { key: "ask", icon: "message-circle", label: "Ask" },
-  { key: "people", icon: "users", label: "People" },
-  { key: "notes", icon: "edit-3", label: "Notes" },
+  { key: "memory", icon: "layers", label: "Memory" },
   { key: "you", icon: "user", label: "You" },
 ];
 
@@ -39,5 +38,5 @@ const s = StyleSheet.create({
   item: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 2 },
   label: { fontFamily: f.medium, fontSize: 11, color: c.muted, marginTop: 4 },
   labelOn: { color: c.ink },
-  badge: { position: "absolute", top: -2, right: -5, width: 9, height: 9, borderRadius: 5, backgroundColor: c.signal, borderWidth: 2, borderColor: c.canvas },
+  badge: { position: "absolute", top: -2, right: -5, width: 9, height: 9, borderRadius: 5, backgroundColor: c.accent, borderWidth: 2, borderColor: c.canvas },
 });

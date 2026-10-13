@@ -19,7 +19,7 @@ export function ScenarioSheet({ visible, onClose, onRun }: { visible: boolean; o
   return (
     <Sheet visible={visible} onClose={onClose}>
       <Text style={t.title2}>Demo</Text>
-      <Text style={[t.subhead, { marginTop: 4, marginBottom: sp.l }]}>Trigger a moment and watch Aura respond in the conversation.</Text>
+      <Text style={[t.callout, { marginTop: 4, marginBottom: sp.l }]}>Trigger a moment and watch Aura respond in the conversation.</Text>
       <View style={{ borderTopWidth: 1, borderTopColor: c.ink }}>
         {SCENARIOS.map((x, i) => (
           <View key={x.key}>
@@ -58,6 +58,35 @@ export function EditDraftSheet({ card, onClose, onSend }: { card: Card | null; o
   );
 }
 
+// A plain confirmation for anything that can't be undone. Replaces Alert so it works everywhere.
+export function ConfirmSheet({ visible, title, body, confirm, onConfirm, onClose }: { visible: boolean; title: string; body: string; confirm: string; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <Sheet visible={visible} onClose={onClose}>
+      <Text style={t.title2}>{title}</Text>
+      <Text style={[t.callout, { marginTop: sp.s }]}>{body}</Text>
+      <View style={s.editActions}>
+        <Button label={confirm} onPress={onConfirm} style={{ flex: 1 }} />
+        <Button label="Cancel" variant="secondary" onPress={onClose} />
+      </View>
+    </Sheet>
+  );
+}
+
+// Unfiltered mode is for adults. The confirmation is recorded on the server with a timestamp.
+export function AdultSheet({ visible, onConfirm, onClose, busy }: { visible: boolean; onConfirm: () => void; onClose: () => void; busy?: boolean }) {
+  return (
+    <Sheet visible={visible} onClose={onClose}>
+      <Text style={t.caption}>Unfiltered mode</Text>
+      <Text style={[t.title1, { marginTop: 4 }]}>Are you 18 or older?</Text>
+      <Text style={[t.callout, { marginTop: sp.m }]}>Unfiltered Aura answers mature, explicit and controversial questions directly, without disclaimers. It still won't sexualize minors or help anyone cause mass harm.</Text>
+      <View style={s.editActions}>
+        <Button label="I'm 18 or older" onPress={onConfirm} loading={busy} style={{ flex: 1 }} />
+        <Button label="Not now" variant="secondary" onPress={onClose} />
+      </View>
+    </Sheet>
+  );
+}
+
 export function ProSheet({ visible, onClose, onSubscribe, busy, error }: { visible: boolean; onClose: () => void; onSubscribe: () => void; busy: boolean; error: string }) {
   return (
     <Sheet visible={visible} onClose={onClose}>
@@ -68,14 +97,13 @@ export function ProSheet({ visible, onClose, onSubscribe, busy, error }: { visib
       </View>
       <View style={s.list}>
         {[
-          ["Unlimited people", "Keep everyone, not just your closest few."],
-          ["Unlimited promises", "Every \"I'll send you that\" tracked until it's done."],
-          ["The daily brief", "Who needs you today, in one message."],
+          ["Unlimited memory", "Everything you tell Aura, kept and used, with no cap."],
+          ["The daily brief", "Your day across work and life, in one message."],
           ["Priority AI model", ""],
         ].map(([k, v]) => (
           <View key={k} style={s.item}>
             <Text style={t.label}>{k}</Text>
-            {v ? <Text style={[t.subhead, { marginTop: 2 }]}>{v}</Text> : null}
+            {v ? <Text style={[t.callout, { marginTop: 2 }]}>{v}</Text> : null}
           </View>
         ))}
       </View>
@@ -95,5 +123,5 @@ const s = StyleSheet.create({
   per: { flex: 1, fontFamily: f.regular, fontSize: 14, lineHeight: 19, color: c.ink2, paddingBottom: 6 },
   list: { marginTop: sp.xl, borderTopWidth: 1, borderTopColor: c.ink },
   item: { paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.line },
-  err: { fontFamily: f.medium, fontSize: 13.5, color: c.signalText, marginTop: sp.l },
+  err: { fontFamily: f.medium, fontSize: 13.5, color: c.accentText, marginTop: sp.l },
 });

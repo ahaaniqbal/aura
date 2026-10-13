@@ -1,28 +1,22 @@
-# Aura — your ambient AI, with taste
+# Aura demo
 
-**One line:** Aura is a notes + chat app with an ambient brain — it remembers everything (HydraDB), works in the background, and only ever interrupts you to approve the things that matter.
-
-Built at "Agents you Love" (Jun 21, 2026). Aiming: **Best Overall** (Memory/Context + Workflow + People-Love).
+**One line:** Aura is a personal AI for your work and your life. It remembers you, has a personality you pick, does things in your real apps with your OK, and for adults who opt in, it answers without the lectures.
 
 ## The 90-second demo (on the iPhone)
 
-1. **You tab, Connected apps.** Gmail, Google Calendar, Notion and Slack connect through real OAuth. Tap Connect on a couple. *"Aura plugs into your life."*
-2. **Ask.** Type: *"Sam's birthday is June 28th. He's obsessed with chocolate cake."* Aura replies and quietly files it.
-3. **People.** Sam now has a record: birthday, what he'd love, when you last spoke. *"This lives in HydraDB and comes back the moment it's useful."*
-4. **Ask, Demo, "Walk past a bakery".** Aura proactively suggests picking up the chocolate cake, with a **From memory** line showing why. Approve, and it's ordered on the Aura card. (memory, proactive, approval, action, end to end)
-5. **Ask, Demo, "Urgent email arrives".** The phone buzzes; an **Urgent** card shows the full reply Aura drafted. Edit it if you like, then **Send reply**. It waits five seconds behind Undo, then sends through Gmail. *"It protects your attention: handles the rest, interrupts only when it counts."*
+1. **First run.** Pick a personality (try Witty), then answer "What's on your plate?" with a few lines about work and life. Aura shows back what it picked up. *"It knows you after one message."*
+2. **Aura tab.** Ask *"anything i'm forgetting today?"* It answers across work and life from memory, in the voice you picked.
+3. **Demo: "Urgent email arrives".** Long-press the vermilion dot at the top of the chat to open the demo triggers (in development builds there's also a Demo button). An **Urgent** card shows the full reply Aura drafted. Edit it if you like, then **Send reply**. It waits five seconds behind Undo, then sends through Gmail.
+4. **Demo: "Walk past a bakery".** Aura suggests picking up the cake a friend would love, with a **From memory** line showing why. Approve and it's ordered on the Aura card.
+5. **Memory tab.** Everything Aura knows about you, your people and your reminders. Forget one fact (with Undo). *"Memory you can see and control."*
+6. **You tab.** Switch personality to Blunt and ask the same question again. Then, once Unblock is connected, show **Unfiltered**: the 18+ confirmation, and the chat header now reads "Blunt · Unfiltered".
 
-> Everything is one engine: `capture → remember → recall → decide → propose → approve → execute → learn`. The three flows are just config on it.
+> Everything is one engine: `capture → remember → recall → decide → propose → approve → execute → learn`. The demo flows are config on it.
 
 ## Architecture
 
-- **Expo (React Native)** app on iPhone — Today, Ask, People, Notes and You tabs set in ABC Diatype, local-notification interrupt, live via 2s feed poll.
-- **Butterbase** backend — Postgres (memories, cards, actions, context), serverless functions (`capture`, `simulate`, `approve`, `feed`), Claude (`claude-sonnet-4.6`) via the AI gateway, realtime. App id `app_6nromeez40uq`.
-- **HydraDB** — memory of record (per-user via tenant/sub-tenant; `context.ingest` + `query`). Postgres mirror is the never-fail fallback.
-- **AgentCard** (test mode) — the "pays, with your ok" capability. **Composio (via Butterbase integrations)** — the connect-your-tools layer (gmail/calendar/notion/slack).
-
-## Why it wins
-
-- **Memory/Context:** recall is visible and undeniable (the 🧠 chips + Memory tab), backed by HydraDB.
-- **Workflow:** automate-then-approve — Aura does the work, you just tap.
-- **People-Love:** real character (Poke-supercharged) + an elite, calm, pastel identity that lives up to the name.
+- **Expo (React Native)** app: Aura, Today, Memory and You tabs in ABC Diatype, local notifications, live via polling.
+- **Butterbase** backend: Postgres (memories, cards, actions, settings), serverless functions (`agent`, `settings`, `feed`, `simulate`, `approve`), Claude via the AI gateway. App id `app_6nromeez40uq`.
+- **HydraDB**: memory of record (per user via tenant and sub-tenant). The Postgres mirror is the fallback.
+- **Composio** for Gmail, Calendar, Notion and Slack. **AgentCard** (test mode) for paying, with your OK.
+- **Unblock** for Unfiltered mode. Needs `UNBLOCK_API_KEY` and `UNBLOCK_MODEL` on the server; until then the toggle shows "Not connected". See the README for what's wired.

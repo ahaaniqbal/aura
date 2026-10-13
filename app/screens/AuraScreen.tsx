@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Mark, { MarkState, Typing } from "../components/Mark";
 import MicButton from "../components/MicButton";
@@ -10,20 +10,23 @@ import type { Card, Feed, Message } from "../lib/api";
 
 const INPUT_LINE_H = 22;
 const INPUT_MAX_H = 120;
-const STARTERS = [
-  "Sarah's birthday is May 4th and she loves tulips",
-  "What's on my calendar today?",
-  "Anything urgent in my inbox?",
+const STARTERS: { group: string; text: string }[] = [
+  { group: "Work", text: "What's on my calendar tomorrow?" },
+  { group: "Work", text: "Anything in my inbox I should deal with today?" },
+  { group: "Life", text: "Remind me to call my mom on Sunday at 6" },
+  { group: "Life", text: "Give me your honest take on quitting my job to build something" },
 ];
 
-export default function AskScreen({ feed, pending, thinking, notice, busy, draft, setDraft, onSend, onAct, onEdit, hidden, onClear, onDemo, markState, status, focusKey }: {
+// The home of the app: one conversation with Aura that never resets its memory.
+export default function AuraScreen({ feed, pending, thinking, notice, busy, draft, setDraft, onSend, onAct, onEdit, hidden, onClear, onDemo, markState, subtitle, focusKey }: {
   feed: Feed | null; pending: { id: string; content: string }[]; thinking: boolean; notice: string | null; busy: boolean;
   draft: string; setDraft: (v: string | ((p: string) => string)) => void; onSend: () => void; onAct: (c: Card, d: "approve" | "decline") => void;
-  onEdit: (c: Card) => void; hidden: Set<string>; onClear: () => void; onDemo: () => void; markState: MarkState; status: string; focusKey: number;
+  onEdit: (c: Card) => void; hidden: Set<string>; onClear: () => void; onDemo: () => void; markState: MarkState; subtitle: string; focusKey: number;
 }) {
   const scroller = useRef<ScrollView>(null);
   const input = useRef<TextInput>(null);
   const [inputH, setInputH] = useState(INPUT_LINE_H);
+  const [focused, setFocused] = useState(false);
   const messages = feed?.messages || [];
   const cards = feed?.cards || [];
   const cardById = (id: string | null) => (id ? cards.find((x) => x.id === id) : undefined);
@@ -37,14 +40,17 @@ export default function AskScreen({ feed, pending, thinking, notice, busy, draft
   return (
     <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
       <View style={s.header}>
-        <Mark size={30} state={markState} />
-        <View style={{ flex: 1, marginLeft: sp.m }}>
+        {/* long-press the mark to open the demo scenarios */}
+        <Pressable onLongPress={onDemo} delayLongPress={600} accessibilityLabel="Aura" accessibilityHint="Long press for demo scenarios">
+          <Mark size={30} state={markState} />
+        </Pressable>
+        <View style={{ flex: 1, marginLeft: sp.s }}>
           <Text style={t.headline}>Aura</Text>
-          <Text style={[t.footnote, { marginTop: 1 }]} numberOfLines={1}>{status}</Text>
+          <Text style={[t.footnote, { marginTop: 1 }]} numberOfLines={1}>{subtitle}</Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: sp.s }}>
           {hasChat ? <IconButton icon="trash-2" size={32} variant="plain" color={c.ink2} onPress={onClear} label="Clear conversation" /> : null}
-          <Button label="Demo" size="sm" variant="secondary" onPress={onDemo} />
+          {__DEV__ ? <Button label="Demo" size="sm" variant="secondary" onPress={onDemo} /> : null}
         </View>
       </View>
 
@@ -65,12 +71,14 @@ export default function AskScreen({ feed, pending, thinking, notice, busy, draft
       </ScrollView>
 
       <View style={s.composer}>
-        <View style={[s.shell, inputH > INPUT_LINE_H && { alignItems: "flex-end" }]}>
+        <View style={[s.shell, focused && s.shellFocus, inputH > INPUT_LINE_H && { alignItems: "flex-end" }]}>
           <TextInput
             ref={input}
             style={[s.input, inputReset, { height: Math.max(INPUT_LINE_H, inputH) }]}
             value={draft}
             onChangeText={setDraft}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             placeholder="Message Aura"
             placeholderTextColor={c.faint}
             selectionColor={c.accent}
@@ -95,7 +103,7 @@ function Bubble({ m }: { m: Message }) {
   }
   return (
     <View style={s.auraRow}>
-      {m.kind === "reminder" ? <Text style={s.kind}>Reminder</Text> : null}
+      {m.kind === "reminder" ? <Text style={s.kind}>Reminder</Text> : m.kind === "brief" ? <Text style={[s.kind, { color: c.muted }]}>Your brief</Text> : null}
       <Text style={[t.body, m.kind === "system" && { color: c.muted }]}>{m.content}</Text>
     </View>
   );
@@ -104,15 +112,15 @@ function Bubble({ m }: { m: Message }) {
 function Empty({ onSuggest }: { onSuggest: (t: string) => void }) {
   return (
     <View style={{ paddingTop: sp.xxl }}>
-      <Text style={t.title1}>Tell Aura about someone, or ask anything.</Text>
-      <Text style={[t.callout, { marginTop: sp.s }]}>It remembers what you say and brings it back when it matters. A few ways to start:</Text>
+      <Text style={t.title1}>What's on your mind?</Text>
+      <Text style={[t.callout, { marginTop: sp.s }]}>Work, life, anything. Aura remembers what you tell it and gets things done in the apps you connect.</Text>
       <View style={s.starters}>
         {STARTERS.map((x, i) => (
-          <View key={x}>
+          <View key={x.text}>
             {i > 0 ? <Divider /> : null}
-            <Press onPress={() => onSuggest(x)} style={s.starter} scaleTo={0.99} accessibilityLabel={x}>
-              <Text style={[t.body, { flex: 1 }]}>{x}</Text>
-              <Feather name="corner-down-left" size={15} color={c.muted} />
+            <Press onPress={() => onSuggest(x.text)} style={s.starter} scaleTo={0.99} accessibilityLabel={x.text}>
+              <Text style={s.group}>{x.group}</Text>
+              <Text style={[t.body, { flex: 1 }]}>{x.text}</Text>
             </Press>
           </View>
         ))}
@@ -128,12 +136,14 @@ const s = StyleSheet.create({
   userRow: { flexDirection: "row", justifyContent: "flex-end", marginBottom: sp.l },
   userBubble: { maxWidth: "84%", backgroundColor: c.sunken, borderRadius: r.md, paddingHorizontal: 14, paddingVertical: 10 },
   auraRow: { marginBottom: sp.l, maxWidth: "94%" },
-  kind: { fontFamily: f.medium, fontSize: 12.5, color: c.signalText, marginBottom: 4 },
+  kind: { fontFamily: f.medium, fontSize: 13, color: c.accentText, marginBottom: 4 },
   thinking: { paddingVertical: 8, marginBottom: sp.l },
   starters: { marginTop: sp.xxl, borderTopWidth: 1, borderTopColor: c.ink },
-  starter: { flexDirection: "row", alignItems: "center", gap: sp.m, paddingVertical: 15 },
+  starter: { flexDirection: "row", alignItems: "baseline", gap: sp.l, paddingVertical: 15 },
+  group: { width: 40, fontFamily: f.medium, fontSize: 13, color: c.muted },
   composer: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 },
-  shell: { flexDirection: "row", alignItems: "center", gap: 2, backgroundColor: c.surface, borderRadius: r.md, borderWidth: 1, borderColor: c.lineStrong, paddingLeft: 14, paddingRight: 6, paddingVertical: 6 },
+  shell: { flexDirection: "row", alignItems: "center", gap: 2, backgroundColor: c.surface, borderRadius: r.md, borderWidth: 1, borderColor: c.control, paddingLeft: 14, paddingRight: 6, paddingVertical: 6 },
+  shellFocus: { borderColor: c.ink },
   input: { flex: 1, fontFamily: f.regular, fontSize: 16, lineHeight: INPUT_LINE_H, color: c.ink, paddingTop: 0, paddingBottom: 0, paddingRight: 6, marginVertical: 6, textAlignVertical: "center" },
   send: { width: 34, height: 34, borderRadius: r.sm, backgroundColor: c.ink, alignItems: "center", justifyContent: "center" },
   sendOff: { backgroundColor: c.sunken },

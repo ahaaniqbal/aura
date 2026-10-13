@@ -4,23 +4,23 @@ import { c, f } from "../theme";
 
 export type MarkState = "idle" | "thinking";
 
-// Aura's mark is typographic: a lowercase Diatype "a" on a cobalt square, the same as the app
-// icon. It holds still unless Aura is working, when it dims and returns on a steady beat.
-export default function Mark({ size = 32, state = "idle", inverse, style }: { size?: number; state?: MarkState; inverse?: boolean; style?: any }) {
+// Aura's mark is a single vermilion dot: the light that's on when Aura is with you. It holds
+// still at rest and pulses only while Aura is working. The app icon is the same dot on ink.
+export default function Mark({ size = 28, state = "idle", ink, style }: { size?: number; state?: MarkState; ink?: boolean; style?: any }) {
   const a = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     if (state !== "thinking") { a.setValue(1); return; }
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(a, { toValue: 0.45, duration: 600, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      Animated.timing(a, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      Animated.timing(a, { toValue: 0.4, duration: 560, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      Animated.timing(a, { toValue: 1, duration: 560, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
     ]));
     loop.start();
     return () => loop.stop();
   }, [state]);
   return (
-    <Animated.View accessibilityLabel="Aura" style={[{ width: size, height: size, borderRadius: size * 0.24, backgroundColor: inverse ? c.onAccent : c.accent, alignItems: "center", justifyContent: "center", opacity: a }, style]}>
-      <Text style={{ fontFamily: f.bold, fontSize: size * 0.66, lineHeight: size * 0.8, letterSpacing: -size * 0.02, color: inverse ? c.accent : c.onAccent, marginTop: -size * 0.06 }}>a</Text>
-    </Animated.View>
+    <View accessibilityLabel={state === "thinking" ? "Aura is working" : "Aura"} style={[{ width: size, height: size, alignItems: "center", justifyContent: "center" }, style]}>
+      <Animated.View style={{ width: size * 0.62, height: size * 0.62, borderRadius: size, backgroundColor: ink ? c.ink : c.accent, opacity: a, transform: [{ scale: a.interpolate({ inputRange: [0.4, 1], outputRange: [0.86, 1] }) }] }} />
+    </View>
   );
 }
 

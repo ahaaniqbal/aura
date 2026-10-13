@@ -175,6 +175,21 @@ export const rememberDone = (id: string) => post("remember", { op: "done", id })
 export const closePromise = (text: string) => post("graph", { op: "close_promise", text });
 export const registerDevice = (token: string, platform: string) => post("register_device", { token, platform });
 
+// ---------------- assistant settings: personality, unfiltered mode, instructions ----------------
+export type Personality = "witty" | "warm" | "blunt" | "chill";
+export type Settings = { personality: Personality; unfiltered: boolean; adult_confirmed: boolean; instructions: string; unfiltered_available: boolean };
+export const DEFAULT_SETTINGS: Settings = { personality: "witty", unfiltered: false, adult_confirmed: false, instructions: "", unfiltered_available: false };
+export const getSettings = async (): Promise<Settings> => {
+  try { const d = await post("settings", { op: "get" }); return { ...DEFAULT_SETTINGS, ...(d?.settings || {}) }; }
+  catch (e) { return DEFAULT_SETTINGS; }
+};
+export const saveSettings = async (patch: { personality?: Personality; unfiltered?: boolean; confirm_adult?: boolean; instructions?: string }): Promise<{ ok: boolean; settings?: Settings; error?: string }> => {
+  try { const d = await post("settings", { op: "set", ...patch }); return d?.ok ? { ok: true, settings: { ...DEFAULT_SETTINGS, ...d.settings } } : { ok: false, error: d?.error || "failed" }; }
+  catch (e) { return { ok: false, error: "network" }; }
+};
+export const forgetMemory = (id: string) => post("settings", { op: "forget", id });
+export const forgetAllMemories = () => post("settings", { op: "forget_all" });
+
 // ---------------- payments (Butterbase Stripe Connect) ----------------
 const BILLING = `https://api.butterbase.ai/v1/${APP}/billing`;
 export type Plan = { id: string; name: string; priceCents: number; interval: string; features?: string[] };
