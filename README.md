@@ -30,7 +30,7 @@ The engine is one loop: `capture -> remember -> recall -> decide -> surface -> a
 
 ## Repository
 
-- `app/` — the Expo (React Native, TypeScript) app: chat (with swipe-to-approve cards and a clear-chat control that keeps memory), notes, connect/onboarding, the animated "aura" orb, voice mic, local-notification interrupt.
+- `app/` — the Expo (React Native, TypeScript) app. `screens/` holds the five tabs (Today, Ask, People, Notes, You) and sign-in; `components/` holds the design system primitives (`ui.tsx`), approval cards with edit and undo, the person record, the conversation recorder and onboarding; `theme.ts` holds the tokens (ABC Diatype, cobalt for Aura, signal orange for "needs you now").
 - `backend/functions/` — the Butterbase serverless functions (deployed at runtime):
   - `capture` — tool-aware chat: store + recall memory, read live Gmail when asked, reply in Aura's voice.
   - `sync_email` — fetch the real inbox, draft a reply to the message that needs one (deduped per message).

@@ -1,176 +1,175 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Modal, Pressable, SafeAreaView, ScrollView, Text, View } from "react-native";
+import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { LinearGradient } from "expo-linear-gradient";
-import { useAudioRecorder, AudioModule, RecordingPresets, setAudioModeAsync } from "expo-audio";
+import { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets, setAudioModeAsync } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
-import { Feather } from "@expo/vector-icons";
-import Orb from "./Orb";
-import { c, font, grad, shadow } from "../theme";
+import Mark from "./Mark";
+import { Button, IconButton, Press } from "./ui";
+import { c, f, sp, t } from "../theme";
 import { transcribe, capture } from "../lib/api";
 
 type Phase = "idle" | "rec" | "proc" | "done" | "err";
+type Fail = "perm" | "upload" | "silent";
+const BARS = 36;
 
-// Ambient capture in your hand: record a conversation, Aura remembers the people, the
-// promises, and the emotional weight of what was said. The moat-neutralizer, made real.
+// Record a conversation and Aura keeps the people, the promises and what mattered. The level
+// meter is the real microphone input; if processing fails, the recording is kept for a retry.
 export default function CaptureMoment({ visible, onClose, onCaptured }: { visible: boolean; onClose: () => void; onCaptured: () => void }) {
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
+  const rs = useAudioRecorderState(recorder, 90);
   const [phase, setPhase] = useState<Phase>("idle");
+  const [fail, setFail] = useState<Fail>("upload");
   const [secs, setSecs] = useState(0);
+  const [levels, setLevels] = useState<number[]>(() => Array(BARS).fill(0));
   const [result, setResult] = useState<{ summary: string; people: number; promises: number; care: number } | null>(null);
   const timer = useRef<any>(null);
-  const pulse = useRef(new Animated.Value(1)).current;
-  const loop = useRef<Animated.CompositeAnimation | null>(null);
+  const lastUri = useRef<string | null>(null);
 
-  useEffect(() => { if (!visible) { reset(); } return () => { if (timer.current) clearInterval(timer.current); loop.current?.stop(); }; }, [visible]);
-  const reset = () => { setPhase("idle"); setSecs(0); setResult(null); if (timer.current) clearInterval(timer.current); loop.current?.stop(); pulse.setValue(1); };
+  useEffect(() => { if (!visible) reset(); return () => { if (timer.current) clearInterval(timer.current); }; }, [visible]);
+  // metering arrives in dBFS (about -60 quiet to 0 loud); keep a rolling window for the meter
+  useEffect(() => {
+    if (phase !== "rec") return;
+    const db = typeof rs.metering === "number" ? rs.metering : -60;
+    const v = Math.max(0, Math.min(1, (db + 55) / 50));
+    setLevels((l) => [...l.slice(1), v]);
+  }, [rs.metering, rs.durationMillis]);
+
+  const reset = () => { setPhase("idle"); setSecs(0); setResult(null); setLevels(Array(BARS).fill(0)); lastUri.current = null; if (timer.current) clearInterval(timer.current); };
 
   const start = async () => {
     try {
       const perm = await AudioModule.requestRecordingPermissionsAsync();
-      if (!perm.granted) { setPhase("err"); return; }
+      if (!perm.granted) { setFail("perm"); setPhase("err"); return; }
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       setPhase("rec"); setSecs(0);
       timer.current = setInterval(() => setSecs((s) => s + 1), 1000);
-      loop.current = Animated.loop(Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.12, duration: 640, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 640, useNativeDriver: true }),
-      ]));
-      loop.current.start();
-    } catch (e) { setPhase("err"); }
+    } catch (e) { setFail("perm"); setPhase("err"); }
+  };
+
+  const process = async (uri: string) => {
+    setPhase("proc");
+    try {
+      const b64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" as any });
+      const text = await transcribe(b64, "audio/m4a");
+      if (!text) { setFail("silent"); setPhase("err"); return; }
+      const res: any = await capture(text);
+      setResult({ summary: res?.summary || "Got it. I've updated your memory.", people: res?.people || 0, promises: res?.promises || 0, care: res?.care || 0 });
+      setPhase("done");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      onCaptured();
+    } catch (e) { setFail("upload"); setPhase("err"); }
   };
 
   const stop = async () => {
     if (timer.current) clearInterval(timer.current);
-    loop.current?.stop(); pulse.setValue(1);
-    setPhase("proc");
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
       await recorder.stop();
-      const uri = recorder.uri;
-      if (!uri) throw new Error("no audio");
-      const b64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" as any });
-      const text = await transcribe(b64, "audio/m4a");
-      if (!text) throw new Error("nothing heard");
-      const r: any = await capture(text);
-      setResult({ summary: r?.summary || "got it, i've updated your memory.", people: r?.people || 0, promises: r?.promises || 0, care: r?.care || 0 });
-      setPhase("done");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      onCaptured();
-    } catch (e) { setPhase("err"); }
+      lastUri.current = recorder.uri;
+      if (!recorder.uri) { setFail("upload"); setPhase("err"); return; }
+      await process(recorder.uri);
+    } catch (e) { setFail("upload"); setPhase("err"); }
   };
 
-  const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={m.fill}>
-        <LinearGradient colors={grad.cons as any} style={m.abs} />
-        <StatusBar style="light" />
-        <SafeAreaView style={m.fill}>
-          <View style={m.top}>
-            <Text style={m.kicker}>capture a moment</Text>
-            <Pressable onPress={onClose} hitSlop={10} style={m.close}><Feather name="x" size={20} color="#fff" /></Pressable>
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+      <SafeAreaView style={s.fill}>
+        <StatusBar style="dark" />
+        <View style={s.top}>
+          <Text style={t.label}>Record a conversation</Text>
+          <IconButton icon="x" size={36} onPress={onClose} label="Close" />
+        </View>
+
+        {phase === "idle" && (
+          <View style={s.body}>
+            <View style={{ flex: 1, justifyContent: "center" }}>
+              <Text style={t.display}>Talk. Aura takes the notes.</Text>
+              <Text style={[t.callout, { marginTop: sp.m }]}>Who was there, what's new with them, and anything you promised, filed into their records when you stop.</Text>
+              <Text style={[t.footnote, { marginTop: sp.xl }]}>Let people know before you start recording.</Text>
+            </View>
+            <View style={s.recWrap}>
+              <Press onPress={start} style={s.recBtn} scaleTo={0.94} accessibilityLabel="Start recording"><View style={s.recDot} /></Press>
+              <Text style={[t.footnote, { marginTop: sp.m }]}>Start recording</Text>
+            </View>
           </View>
+        )}
 
-          {phase === "idle" && (
-            <View style={m.center}>
-              <Orb size={110} state="idle" />
-              <Text style={m.h}>i'll remember it for you.</Text>
-              <Text style={m.p}>record a conversation, a call, a catch up. i'll capture the people, the promises, and what matters, so you never have to take notes again.</Text>
-              <Pressable onPress={start} style={({ pressed }) => [m.recBtn, pressed && { transform: [{ scale: 0.97 }] }]}>
-                <Feather name="mic" size={26} color="#fff" />
-              </Pressable>
-              <Text style={m.hint}>tap to start</Text>
-            </View>
-          )}
-
-          {phase === "rec" && (
-            <View style={m.center}>
-              <Animated.View style={{ transform: [{ scale: pulse }] }}><Orb size={120} state="warm" /></Animated.View>
-              <Text style={m.timer}>{fmt(secs)}</Text>
-              <Text style={m.p}>listening… talk naturally, i'm following along.</Text>
-              <Pressable onPress={stop} style={({ pressed }) => [m.stopBtn, pressed && { transform: [{ scale: 0.97 }] }]}>
-                <Feather name="square" size={22} color={c.accent} />
-                <Text style={m.stopTxt}>stop and save</Text>
-              </Pressable>
-            </View>
-          )}
-
-          {phase === "proc" && (
-            <View style={m.center}>
-              <Orb size={110} state="thinking" />
-              <Text style={m.h}>remembering…</Text>
-              <ActivityIndicator color="#fff" style={{ marginTop: 14 }} />
-            </View>
-          )}
-
-          {phase === "done" && result && (
-            <ScrollView contentContainerStyle={m.scroll} keyboardShouldPersistTaps="handled">
-              <Orb size={84} state="warm" />
-              <Text style={m.h}>here's what i caught.</Text>
-              <View style={m.card}><Text style={m.summary}>{result.summary}</Text></View>
-              <View style={m.chips}>
-                <Stat n={result.people} label={result.people === 1 ? "person" : "people"} />
-                <Stat n={result.promises} label={result.promises === 1 ? "promise" : "promises"} />
-                {result.care > 0 ? <Stat n={result.care} label="to hold gently" pink /> : null}
+        {phase === "rec" && (
+          <View style={s.body}>
+            <View style={{ flex: 1, justifyContent: "center" }}>
+              <View style={s.live}><View style={s.liveDot} /><Text style={s.liveTxt}>Recording</Text></View>
+              <Text style={s.timer}>{fmt(secs)}</Text>
+              <View style={s.wave} accessibilityElementsHidden>
+                {levels.map((v, i) => <View key={i} style={[s.waveBar, { height: 3 + v * 69 }]} />)}
               </View>
-              <Pressable onPress={onClose} style={({ pressed }) => [m.doneBtn, pressed && { opacity: 0.92 }]}><Text style={m.doneTxt}>done</Text></Pressable>
-              <Pressable onPress={reset} hitSlop={10} style={{ marginTop: 14, alignSelf: "center" }}><Text style={m.again}>capture another</Text></Pressable>
-            </ScrollView>
-          )}
-
-          {phase === "err" && (
-            <View style={m.center}>
-              <Orb size={96} state="idle" />
-              <Text style={m.h}>i didn't quite catch that.</Text>
-              <Text style={m.p}>make sure i can hear you, then try again.</Text>
-              <Pressable onPress={reset} style={m.doneBtn}><Text style={m.doneTxt}>try again</Text></Pressable>
             </View>
-          )}
-        </SafeAreaView>
-      </View>
+            <Button label="Stop and file it" icon="square" onPress={stop} />
+          </View>
+        )}
+
+        {phase === "proc" && (
+          <View style={[s.body, { justifyContent: "center" }]}>
+            <Mark size={40} state="thinking" />
+            <Text style={[t.title1, { marginTop: sp.xl }]}>Listening back</Text>
+            <Text style={[t.callout, { marginTop: 6 }]}>Finding the people and promises in what was said.</Text>
+          </View>
+        )}
+
+        {phase === "done" && result && (
+          <ScrollView contentContainerStyle={s.scroll}>
+            <Text style={t.caption}>Filed</Text>
+            <Text style={[t.title2, { marginTop: 6 }]}>{result.summary}</Text>
+            <Text style={[t.callout, { marginTop: sp.l }]}>
+              Updated {plural(result.people, "person", "people")} and {plural(result.promises, "promise", "promises")}{result.care ? `. ${plural(result.care, "person is", "people are")} going through something.` : "."}
+            </Text>
+            <View style={{ flex: 1 }} />
+            <Button label="Done" onPress={onClose} style={{ marginTop: sp.h }} />
+            <Button label="Record another" variant="ghost" onPress={reset} style={{ marginTop: sp.xs }} />
+          </ScrollView>
+        )}
+
+        {phase === "err" && (
+          <View style={s.body}>
+            <View style={{ flex: 1, justifyContent: "center" }}>
+              <Text style={t.title1}>{fail === "perm" ? "Aura can't hear you." : fail === "silent" ? "Nothing came through." : "That didn't upload."}</Text>
+              <Text style={[t.callout, { marginTop: sp.s }]}>
+                {fail === "perm" ? "Allow microphone access for Aura in Settings, then try again."
+                  : fail === "silent" ? "The recording was too quiet to transcribe. Move closer and record again."
+                  : "Your recording is still here. Check your connection and send it again."}
+              </Text>
+            </View>
+            {fail === "upload" && lastUri.current ? (
+              <>
+                <Button label="Send again" onPress={() => process(lastUri.current as string)} />
+                <Button label="Record again" variant="ghost" onPress={reset} style={{ marginTop: sp.xs }} />
+              </>
+            ) : <Button label="Try again" onPress={reset} />}
+          </View>
+        )}
+      </SafeAreaView>
     </Modal>
   );
 }
 
-function Stat({ n, label, pink }: { n: number; label: string; pink?: boolean }) {
-  return (
-    <View style={[m.stat, pink && { backgroundColor: "rgba(255,92,168,0.95)", borderColor: "rgba(255,255,255,0.7)" }]}>
-      <Text style={[m.statN, pink && { color: "#fff" }]}>{n}</Text>
-      <Text style={[m.statL, pink && { color: "rgba(255,255,255,0.92)" }]}>{label}</Text>
-    </View>
-  );
-}
-
-const m: any = {
-  fill: { flex: 1 },
-  abs: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
-  top: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 6 },
-  kicker: { fontFamily: font.display, fontSize: 15, color: "#fff", letterSpacing: -0.3 },
-  close: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.16)" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
-  scroll: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, paddingVertical: 36 },
-  h: { fontFamily: font.display, fontSize: 27, color: "#fff", letterSpacing: -0.8, textAlign: "center", marginTop: 22 },
-  p: { fontFamily: font.medium, fontSize: 16, lineHeight: 24, color: "rgba(255,255,255,0.9)", textAlign: "center", letterSpacing: -0.2, marginTop: 12 },
-  recBtn: { width: 92, height: 92, borderRadius: 46, backgroundColor: c.pink, alignItems: "center", justifyContent: "center", borderWidth: 4, borderColor: "rgba(255,255,255,0.6)", marginTop: 34, ...shadow.puff },
-  hint: { fontFamily: font.semibold, fontSize: 14, color: "rgba(255,255,255,0.8)", letterSpacing: -0.2, marginTop: 16 },
-  timer: { fontFamily: font.display, fontSize: 40, color: "#fff", letterSpacing: -1, marginTop: 24, fontVariant: ["tabular-nums"] },
-  stopBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#fff", height: 54, paddingHorizontal: 26, borderRadius: 999, marginTop: 34, borderWidth: 3, borderColor: "rgba(255,255,255,0.6)", ...shadow.puff },
-  stopTxt: { fontFamily: font.bold, fontSize: 16, color: c.accent, letterSpacing: -0.3 },
-  card: { alignSelf: "stretch", backgroundColor: "#fff", borderRadius: 22, padding: 18, marginTop: 18, ...shadow.card },
-  summary: { fontFamily: font.medium, fontSize: 16, lineHeight: 25, color: c.ink, letterSpacing: -0.2 },
-  chips: { flexDirection: "row", justifyContent: "center", gap: 8, marginTop: 16 },
-  stat: { backgroundColor: "rgba(255,255,255,0.94)", borderRadius: 16, borderWidth: 2.5, borderColor: "#fff", paddingVertical: 9, paddingHorizontal: 14, alignItems: "center", minWidth: 78, ...shadow.soft },
-  statN: { fontFamily: font.display, fontSize: 20, color: c.ink, letterSpacing: -0.5 },
-  statL: { fontFamily: font.semibold, fontSize: 10.5, color: c.muted, letterSpacing: -0.2, marginTop: 1 },
-  doneBtn: { alignSelf: "stretch", height: 56, borderRadius: 18, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", marginTop: 26, borderWidth: 3, borderColor: "rgba(255,255,255,0.6)", ...shadow.puff },
-  doneTxt: { fontFamily: font.bold, fontSize: 17, color: c.accent, letterSpacing: -0.3 },
-  again: { fontFamily: font.semibold, fontSize: 15, color: "rgba(255,255,255,0.85)", letterSpacing: -0.2 },
-};
-
-// note: `pink` stat uses a solid statN/statL that need white; override via inline when pink is set.
+const s = StyleSheet.create({
+  fill: { flex: 1, backgroundColor: c.canvas },
+  top: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
+  body: { flex: 1, paddingHorizontal: 24, paddingBottom: 24 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 48, paddingBottom: 24 },
+  recWrap: { alignItems: "center", paddingBottom: sp.l },
+  recBtn: { width: 80, height: 80, borderRadius: 40, borderWidth: 2, borderColor: c.ink, alignItems: "center", justifyContent: "center" },
+  recDot: { width: 60, height: 60, borderRadius: 30, backgroundColor: c.signal },
+  live: { flexDirection: "row", alignItems: "center", gap: 7 },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.signal },
+  liveTxt: { fontFamily: f.medium, fontSize: 14, color: c.signalText },
+  timer: { fontFamily: f.medium, fontSize: 76, letterSpacing: -3, color: c.ink, marginTop: sp.s, fontVariant: ["tabular-nums"] },
+  wave: { flexDirection: "row", alignItems: "center", gap: 3, height: 72, marginTop: sp.xxl },
+  waveBar: { flex: 1, borderRadius: 1, backgroundColor: c.ink },
+});

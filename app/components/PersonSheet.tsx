@@ -1,160 +1,107 @@
-import React, { useEffect, useRef } from "react";
-import { Animated, Easing, Modal, Pressable, ScrollView, Text, View } from "react-native";
+import React, { useRef } from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
-import { Feather } from "@expo/vector-icons";
 import Avatar from "./Avatar";
-import { c, font, shadow } from "../theme";
+import { Button, IconButton, Sheet } from "./ui";
+import { c, f, sp, t } from "../theme";
 import type { GraphPerson } from "../lib/api";
 import { closeness, warmth, tieLabel, contactStats } from "../lib/weight";
+import { capitalize, daysUntilBirthday, fmtBday, inDays } from "../lib/dates";
 
-// The person detail. Tap a star in the constellation and the relationship opens up: who they
-// are, what they're carrying, what they want, and what you owe them, each with a way to act.
-// This is where Aura's memory of a person becomes something you can do something about.
-
-function daysUntilBirthday(bday?: string | null): number | null {
-  if (!bday) return null;
-  const m = String(bday).match(/(\d{1,2})[-/](\d{1,2})/);
-  if (!m) return null;
-  const now = new Date();
-  const mm = Number(m[1]) - 1, dd = Number(m[2]);
-  let next = new Date(now.getFullYear(), mm, dd);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (next < today) next = new Date(now.getFullYear() + 1, mm, dd);
-  return Math.round((next.getTime() - today.getTime()) / 86400000);
-}
-const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-function fmtBday(bday?: string | null): string {
-  const m = bday && String(bday).match(/(\d{1,2})[-/](\d{1,2})/);
-  if (!m) return "";
-  return `${MONTHS[Number(m[1]) - 1] || ""} ${Number(m[2])}`;
-}
-
+// The person detail: what Aura knows, as a plain record. Facts first, then what's on their mind,
+// what they'd love, and what you owe them, with the two things you can do about it at the bottom.
 export default function PersonSheet({ person, onClose, onAct }: { person: GraphPerson | null; onClose: () => void; onAct: (text: string) => void }) {
-  const p = person;
-  const first = p ? p.person.split(" ")[0].toLowerCase() : "";
+  // keep the last person while the sheet animates closed
+  const last = useRef<GraphPerson | null>(person);
+  if (person) last.current = person;
+  const p = person || last.current;
+
+  const first = p ? p.person.split(" ")[0] : "";
   const wants = (p?.wants || []).filter(Boolean);
   const promises = (p?.open_promises || []).filter(Boolean);
+  const topics = (p?.topics || []).filter(Boolean);
   const bd = daysUntilBirthday(p?.birthday);
-  const bsoon = bd !== null && bd <= 45;
-  const cl = p ? closeness(p) : 0;
-  const w = p ? warmth(p) : 1;
-  const drift = w < 0.5 && cl >= 34;
   const stats = p ? contactStats(p) : null;
-  const cadence = stats ? [stats.cadenceLabel, stats.lastLabel && `last ${stats.lastLabel}`].filter(Boolean).join("  ·  ") : "";
-  const ring = bsoon ? c.pink : promises.length ? c.coral : drift ? c.blue : c.mint;
+  const tie = p ? capitalize(tieLabel(closeness(p), warmth(p))) : "";
 
-  // the tie meter "reads you in": fills from 0 each time a new person opens
-  const grow = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (!p) return;
-    grow.setValue(0);
-    Animated.timing(grow, { toValue: 1, duration: 640, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-  }, [p?.person]);
-
-  const run = (t: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); onClose(); onAct(t); };
+  const run = (text: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); onClose(); onAct(text); };
   const gift = () => run(`help me get ${first} something they'd love. they've mentioned wanting: ${wants.join(", ")}. suggest something thoughtful and offer to handle it for me.`);
   const reach = () => run(p?.care ? `help me reach out warmly to ${first}. what's going on: ${p.care}` : `help me reach out to ${first}, i'd love to reconnect.`);
 
+  const facts: [string, string][] = p ? [
+    ["Relationship", [p.relation && capitalize(p.relation), p.org].filter(Boolean).join(", ") || "Not set"],
+    ["Closeness", tie],
+    ...(bd !== null ? [["Birthday", `${fmtBday(p.birthday)}, ${inDays(bd).toLowerCase()}`] as [string, string]] : []),
+    ["Last spoke", stats?.lastLabel ? capitalize(stats.lastLabel) : "Not yet"],
+    ...(stats?.cadenceLabel ? [["Usually", capitalize(stats.cadenceLabel)] as [string, string]] : []),
+  ] : [];
+
   return (
-    <Modal visible={!!p} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={st.scrim} onPress={onClose} />
-      <View style={st.sheet}>
-        <View style={st.grab} />
-        {p ? (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
-            <View style={st.head}>
-              <Avatar name={p.person} size={68} ring={ring} glow={bsoon} />
-              <View style={{ flex: 1, marginLeft: 14 }}>
-                <Text style={st.name}>{p.person.toLowerCase()}</Text>
-                <Text style={st.sub} numberOfLines={1}>
-                  {[p.relation, p.org].filter(Boolean).join(" · ") || "someone you know"}
-                </Text>
+    <Sheet visible={!!person} onClose={onClose}>
+      {p ? (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+          <View style={s.head}>
+            <Avatar name={p.person} size={52} />
+            <Text style={[t.title1, { flex: 1, marginLeft: 14 }]} numberOfLines={2}>{p.person}</Text>
+            <IconButton icon="x" size={34} onPress={onClose} label="Close" />
+          </View>
+
+          <View style={s.facts}>
+            {facts.map(([k, v]) => (
+              <View key={k} style={s.fact}>
+                <Text style={s.key}>{k}</Text>
+                <Text style={[s.val, k === "Birthday" && bd !== null && bd <= 7 && { color: c.signalText }]}>{v}</Text>
               </View>
-              <Pressable onPress={onClose} hitSlop={10} style={st.x}><Feather name="x" size={18} color={c.ink} /></Pressable>
+            ))}
+          </View>
+
+          {p.care ? (
+            <View style={s.block}>
+              <Text style={s.label}>On {first}'s mind</Text>
+              <Text style={s.care}>{p.care}</Text>
             </View>
+          ) : null}
 
-            <View style={st.tie}>
-              <View style={st.meterTrack}><Animated.View style={[st.meterFill, { width: grow.interpolate({ inputRange: [0, 1], outputRange: ["0%", `${Math.max(8, cl)}%`] }), backgroundColor: drift ? c.blue : c.accent }]} /></View>
-              <Text style={[st.tieTxt, drift && { color: c.blue }]}>{tieLabel(cl, w)}</Text>
+          {wants.length ? (
+            <View style={s.block}>
+              <Text style={s.label}>Would love</Text>
+              {wants.map((x) => <Text key={x} style={s.item}>{x}</Text>)}
             </View>
-            {cadence ? <Text style={st.cadence}>{cadence}</Text> : null}
+          ) : null}
 
-            <View style={st.tags}>
-              {bsoon ? <View style={[st.tag, { backgroundColor: c.pink }]}><Text style={st.tagTxt}>🎂 {bd === 0 ? "today" : bd === 1 ? "tomorrow" : `${fmtBday(p.birthday)}, ${bd}d`}</Text></View> : null}
-              {(p.topics || []).slice(0, 3).map((t) => <View key={t} style={st.tagQuiet}><Text style={st.tagQuietTxt}>{t}</Text></View>)}
+          {promises.length ? (
+            <View style={s.block}>
+              <Text style={s.label}>You owe {first}</Text>
+              {promises.map((x) => <Text key={x} style={s.item}>{x}</Text>)}
             </View>
+          ) : null}
 
-            {p.care ? (
-              <View style={st.care}>
-                <View style={st.careHead}><Feather name="heart" size={13} color={c.pink} /><Text style={st.careLabel}>holding gently</Text></View>
-                <Text style={st.careTxt}>{p.care}</Text>
-                <Pressable onPress={reach} style={({ pressed }) => [st.careBtn, pressed && { opacity: 0.9 }]}><Text style={st.careBtnTxt}>reach out to {first}</Text><Feather name="arrow-right" size={15} color="#fff" /></Pressable>
-              </View>
-            ) : null}
+          {topics.length ? (
+            <View style={s.block}>
+              <Text style={s.label}>Talks about</Text>
+              <Text style={[t.body, { marginTop: 6 }]}>{capitalize(topics.slice(0, 6).join(", "))}</Text>
+            </View>
+          ) : null}
 
-            {wants.length ? (
-              <View style={st.block}>
-                <View style={st.blockHead}><Feather name="gift" size={13} color={c.accent} /><Text style={st.blockLabel}>wishlist</Text></View>
-                <View style={st.chips}>{wants.map((w) => <View key={w} style={st.wChip}><Text style={st.wChipTxt}>{w}</Text></View>)}</View>
-                <Pressable onPress={gift} style={({ pressed }) => [st.giftBtn, pressed && { opacity: 0.9 }]}>
-                  <Feather name="gift" size={15} color="#fff" /><Text style={st.giftBtnTxt}>help me gift {first}</Text>
-                </Pressable>
-              </View>
-            ) : null}
-
-            {promises.length ? (
-              <View style={st.block}>
-                <View style={st.blockHead}><Feather name="corner-up-right" size={13} color={c.coral} /><Text style={[st.blockLabel, { color: c.coral }]}>you owe {first}</Text></View>
-                {promises.map((pr) => <View key={pr} style={st.owe}><Text style={st.oweTxt}>{pr}</Text></View>)}
-              </View>
-            ) : null}
-
-            {!p.care ? (
-              <Pressable onPress={reach} style={({ pressed }) => [st.reach, pressed && { opacity: 0.92 }]}>
-                <Feather name="message-circle" size={16} color="#fff" /><Text style={st.reachTxt}>reach out to {first}</Text>
-              </Pressable>
-            ) : null}
-          </ScrollView>
-        ) : null}
-      </View>
-    </Modal>
+          <View style={s.actions}>
+            <Button label={`Reach out to ${first}`} onPress={reach} style={{ flex: 1 }} />
+            {wants.length ? <Button label="Find a gift" variant="secondary" onPress={gift} /> : null}
+          </View>
+        </ScrollView>
+      ) : null}
+    </Sheet>
   );
 }
 
-const st: any = {
-  scrim: { flex: 1, backgroundColor: "rgba(20,12,50,0.34)" },
-  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: c.bg, borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 22, paddingTop: 10, paddingBottom: 30, maxHeight: "82%", ...shadow.card },
-  grab: { alignSelf: "center", width: 42, height: 5, borderRadius: 3, backgroundColor: "rgba(23,19,52,0.14)", marginBottom: 14 },
-  head: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
-  name: { fontFamily: font.display, fontSize: 23, color: c.ink, letterSpacing: -0.7 },
-  sub: { fontFamily: font.medium, fontSize: 13.5, color: c.muted, letterSpacing: -0.2, marginTop: 2 },
-  x: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(23,19,52,0.06)" },
-  tie: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
-  meterTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: "rgba(23,19,52,0.08)", overflow: "hidden" },
-  meterFill: { height: 7, borderRadius: 4 },
-  tieTxt: { fontFamily: font.bold, fontSize: 11.5, color: c.accent, letterSpacing: -0.1 },
-  cadence: { fontFamily: font.medium, fontSize: 12.5, color: c.muted, letterSpacing: -0.2, marginTop: -4, marginBottom: 12 },
-  tags: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 4 },
-  tag: { borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 },
-  tagTxt: { fontFamily: font.bold, fontSize: 12, color: "#fff", letterSpacing: -0.2 },
-  tagQuiet: { borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6, backgroundColor: "rgba(123,92,255,0.1)" },
-  tagQuietTxt: { fontFamily: font.semibold, fontSize: 12, color: c.accent, letterSpacing: -0.2 },
-  care: { backgroundColor: "rgba(255,92,168,0.09)", borderRadius: 20, borderWidth: 1.5, borderColor: "rgba(255,92,168,0.22)", padding: 15, marginTop: 14 },
-  careHead: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 5 },
-  careLabel: { fontFamily: font.bold, fontSize: 11, color: c.pink, letterSpacing: -0.1, textTransform: "lowercase" },
-  careTxt: { fontFamily: font.medium, fontSize: 15, lineHeight: 22, color: c.ink, letterSpacing: -0.2 },
-  careBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: c.pink, height: 46, borderRadius: 14, marginTop: 12, ...shadow.soft },
-  careBtnTxt: { fontFamily: font.bold, fontSize: 15, color: "#fff", letterSpacing: -0.3 },
-  block: { marginTop: 18 },
-  blockHead: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 9 },
-  blockLabel: { fontFamily: font.bold, fontSize: 11, color: c.accent, letterSpacing: -0.1 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
-  wChip: { backgroundColor: "#fff", borderRadius: 14, paddingHorizontal: 13, paddingVertical: 9, borderWidth: 1.5, borderColor: "rgba(123,92,255,0.16)", ...shadow.soft },
-  wChipTxt: { fontFamily: font.semibold, fontSize: 14, color: c.ink, letterSpacing: -0.2 },
-  giftBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: c.accent, height: 50, borderRadius: 16, marginTop: 13, borderWidth: 2.5, borderColor: "#fff", ...shadow.puff },
-  giftBtnTxt: { fontFamily: font.bold, fontSize: 15.5, color: "#fff", letterSpacing: -0.3 },
-  owe: { backgroundColor: "#fff", borderRadius: 14, padding: 13, marginBottom: 7, borderWidth: 1, borderColor: "rgba(255,90,95,0.16)", ...shadow.soft },
-  oweTxt: { fontFamily: font.medium, fontSize: 14.5, lineHeight: 21, color: c.ink, letterSpacing: -0.2 },
-  reach: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: c.accent, height: 52, borderRadius: 16, marginTop: 20, borderWidth: 2.5, borderColor: "#fff", ...shadow.puff },
-  reachTxt: { fontFamily: font.bold, fontSize: 16, color: "#fff", letterSpacing: -0.3 },
-};
+const s = StyleSheet.create({
+  head: { flexDirection: "row", alignItems: "center", marginBottom: sp.xl },
+  facts: { borderTopWidth: 1, borderTopColor: c.ink },
+  fact: { flexDirection: "row", alignItems: "baseline", paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.line },
+  key: { width: 112, fontFamily: f.regular, fontSize: 14, color: c.muted },
+  val: { flex: 1, fontFamily: f.medium, fontSize: 15, color: c.ink, letterSpacing: -0.1 },
+  block: { marginTop: sp.xxl },
+  label: { fontFamily: f.medium, fontSize: 13.5, color: c.muted },
+  care: { fontFamily: f.medium, fontSize: 19, lineHeight: 25, letterSpacing: -0.4, color: c.ink, marginTop: 6 },
+  item: { fontFamily: f.regular, fontSize: 16, lineHeight: 22, color: c.ink, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.line },
+  actions: { flexDirection: "row", gap: sp.s, marginTop: sp.h },
+});

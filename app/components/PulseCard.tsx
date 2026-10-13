@@ -1,115 +1,83 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Animated, Easing, Pressable, Text, View } from "react-native";
+import React, { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
-import { Feather } from "@expo/vector-icons";
-import { c, font, shadow } from "../theme";
+import { c, f, r, sp, t } from "../theme";
 import type { Pulse } from "../lib/api";
 
-// Emotional pulse, Aura's read on YOU. A week of one-tap check-ins becomes a small living
-// chart of how you've been, and Aura reflects it back gently. The one surface that's about
-// the user, not the people around them.
-
+// Aura's read on you: a week of one-tap check-ins drawn as plain bars, and a line reflecting it
+// back. The bars are ink; their height carries the mood, so nothing depends on color.
 const MOODS = [
-  { v: -2, label: "rough", color: c.coral },
-  { v: -1, label: "low", color: "#FF9F45" },
-  { v: 0, label: "ok", color: "#9AA0C9" },
-  { v: 1, label: "good", color: c.mint },
-  { v: 2, label: "great", color: c.accent },
+  { v: -2, key: "rough", label: "Rough" },
+  { v: -1, key: "low", label: "Low" },
+  { v: 0, key: "ok", label: "Okay" },
+  { v: 1, key: "good", label: "Good" },
+  { v: 2, key: "great", label: "Great" },
 ];
-const vcolor = (v: number) => (v <= -2 ? c.coral : v === -1 ? "#FF9F45" : v === 0 ? "#9AA0C9" : v === 1 ? c.mint : c.accent);
-const vheight = (v: number) => (v <= -2 ? 15 : v === -1 ? 23 : v === 0 ? 31 : v === 1 ? 41 : 50);
-function stateWord(avg: number | null): string {
-  if (avg === null) return "";
-  if (avg <= -1) return "a heavy stretch";
-  if (avg < -0.2) return "a bit low";
-  if (avg < 0.5) return "steady";
-  if (avg < 1.3) return "a good week";
-  return "a great week";
+const vheight = (v: number) => 10 + (Math.max(-2, Math.min(2, v)) + 2) * 12;
+function stateWord(avg: number | null): string | null {
+  if (avg === null) return null;
+  if (avg <= -1) return "A heavy stretch";
+  if (avg < -0.2) return "A bit low";
+  if (avg < 0.5) return "Steady";
+  if (avg < 1.3) return "A good week";
+  return "A great week";
 }
 
 export default function PulseCard({ pulse, onPulse }: { pulse: Pulse | null; onPulse: (valence: number, mood: string) => void }) {
-  const days = pulse?.days || [];
+  const days = (pulse?.days || []).slice(-7);
   const hasHistory = days.some((d) => d.valence !== null);
-  const todayLogged = !!pulse?.todayLogged;
-  const reflection = pulse?.reflection || "";
   const word = stateWord(pulse?.avg7 ?? null);
-
-  // the week grows in, bar by bar
-  const bars = useRef([0, 1, 2, 3, 4, 5, 6].map(() => new Animated.Value(0))).current;
-  useEffect(() => {
-    if (!hasHistory) return;
-    bars.forEach((a) => a.setValue(0));
-    Animated.stagger(55, bars.map((a) => Animated.timing(a, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }))).start();
-  }, [hasHistory]);
-
-  // optimistic: flip to "checked in" the instant they tap, before the network returns
-  const [justLogged, setJustLogged] = useState(false);
-  const tap = (v: number, label: string) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setJustLogged(true); onPulse(v, label); };
-  const logged = todayLogged || justLogged;
+  const [picked, setPicked] = useState<string | null>(null);
+  const logged = !!pulse?.todayLogged || !!picked;
+  const tap = (v: number, key: string, label: string) => { Haptics.selectionAsync().catch(() => {}); setPicked(label); onPulse(v, key); };
 
   return (
-    <View style={st.card}>
-      <View style={st.head}>
-        <View style={st.headL}><Feather name="activity" size={14} color={c.accent} /><Text style={st.title}>your pulse</Text></View>
-        {word ? <Text style={st.word}>{word}</Text> : null}
-      </View>
-
+    <View>
+      {word ? <Text style={[t.title2, { marginTop: sp.m }]}>{word}</Text> : null}
+      {pulse?.reflection ? <Text style={[t.callout, { marginTop: 6 }]}>{pulse.reflection}</Text> : null}
       {hasHistory ? (
-        <View style={st.chart}>
-          {days.map((d, i) => (
-            <View key={i} style={st.col}>
-              <View style={st.barWrap}>
-                <Animated.View style={{ opacity: bars[i], transform: [{ translateY: bars[i].interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>
-                  {d.valence === null
-                    ? <View style={st.empty} />
-                    : <View style={[st.bar, { height: vheight(d.valence), backgroundColor: vcolor(d.valence) }]} />}
-                </Animated.View>
+        <View style={s.chart} accessibilityLabel={`Mood over the last ${days.length} days`}>
+          {days.map((d, i) => {
+            const last = i === days.length - 1;
+            const mood = d.valence === null ? null : MOODS[Math.round(d.valence) + 2];
+            return (
+              <View key={i} style={s.col} accessibilityLabel={`${d.day}: ${mood ? mood.label : "no check-in"}`}>
+                <View style={s.barWrap}>
+                  {d.valence === null ? <View style={s.none} /> : <View style={[s.bar, { height: vheight(d.valence) }]} />}
+                </View>
+                <Text style={[s.day, last && { color: c.ink }]}>{(d.day || "").slice(0, 3)}</Text>
               </View>
-              <Text style={st.day}>{d.day[0]}</Text>
-            </View>
-          ))}
+            );
+          })}
         </View>
       ) : null}
 
-      {reflection ? <Text style={st.reflect}>{reflection}</Text> : null}
-
+      <Text style={[t.subhead, { marginTop: sp.xl, marginBottom: sp.s }]}>
+        {logged ? (picked ? `Checked in today: ${picked.toLowerCase()}.` : "You've checked in today.") : hasHistory ? "How's today?" : "How are you today?"}
+      </Text>
       {!logged ? (
-        <>
-          <Text style={st.ask}>{hasHistory ? "how's today?" : "how are you today?"}</Text>
-          <View style={st.moods}>
-            {MOODS.map((m) => (
-              <Pressable key={m.v} onPress={() => tap(m.v, m.label)} style={({ pressed }) => [st.mood, pressed && { transform: [{ scale: 0.92 }] }]}>
-                <View style={[st.dot, { backgroundColor: m.color }]} />
-                <Text style={st.moodTxt}>{m.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </>
-      ) : (
-        <View style={st.done}><Feather name="check" size={13} color={c.mint} /><Text style={st.doneTxt}>checked in today</Text></View>
-      )}
+        <View style={s.picker} accessibilityRole="radiogroup">
+          {MOODS.map((m, i) => (
+            <Pressable key={m.v} onPress={() => tap(m.v, m.key, m.label)} accessibilityRole="radio" accessibilityLabel={m.label}
+              style={({ pressed }) => [s.option, i > 0 && s.optionSep, pressed && { backgroundColor: c.sunken }]}>
+              <Text style={s.optionTxt}>{m.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
 
-const st: any = {
-  card: { backgroundColor: "#fff", borderRadius: 22, padding: 15, marginBottom: 16, ...shadow.card },
-  head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-  headL: { flexDirection: "row", alignItems: "center", gap: 6 },
-  title: { fontFamily: font.display, fontSize: 15.5, color: c.ink, letterSpacing: -0.4 },
-  word: { fontFamily: font.bold, fontSize: 12.5, color: c.accent, letterSpacing: -0.2 },
-  chart: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", height: 60, marginBottom: 6, paddingHorizontal: 2 },
-  col: { alignItems: "center", flex: 1 },
-  barWrap: { height: 52, justifyContent: "flex-end", alignItems: "center" },
-  bar: { width: 10, borderRadius: 6 },
-  empty: { width: 10, height: 8, borderRadius: 5, backgroundColor: "rgba(23,19,52,0.08)" },
-  day: { fontFamily: font.semibold, fontSize: 10, color: c.muted, letterSpacing: -0.2, marginTop: 5, textTransform: "lowercase" },
-  reflect: { fontFamily: font.medium, fontSize: 14, lineHeight: 20, color: c.ink, letterSpacing: -0.2, marginTop: 6, marginBottom: 4 },
-  ask: { fontFamily: font.semibold, fontSize: 13.5, color: c.muted, letterSpacing: -0.2, marginTop: 8, marginBottom: 9 },
-  moods: { flexDirection: "row", justifyContent: "space-between" },
-  mood: { alignItems: "center", flex: 1, gap: 5 },
-  dot: { width: 26, height: 26, borderRadius: 13, borderWidth: 2.5, borderColor: "#fff", ...shadow.soft },
-  moodTxt: { fontFamily: font.semibold, fontSize: 11, color: c.ink, letterSpacing: -0.2 },
-  done: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
-  doneTxt: { fontFamily: font.semibold, fontSize: 13, color: c.muted, letterSpacing: -0.2 },
-};
+const s = StyleSheet.create({
+  chart: { flexDirection: "row", alignItems: "flex-end", marginTop: sp.xl, gap: 6 },
+  col: { flex: 1, alignItems: "stretch" },
+  barWrap: { height: 60, justifyContent: "flex-end" },
+  bar: { backgroundColor: c.ink, borderRadius: 2 },
+  none: { height: 2, backgroundColor: c.lineStrong },
+  day: { fontFamily: f.regular, fontSize: 12, color: c.muted, marginTop: 8 },
+  picker: { flexDirection: "row", borderWidth: 1, borderColor: c.lineStrong, borderRadius: r.sm, overflow: "hidden" },
+  option: { flex: 1, height: 42, alignItems: "center", justifyContent: "center", backgroundColor: c.surface },
+  optionSep: { borderLeftWidth: 1, borderLeftColor: c.lineStrong },
+  optionTxt: { fontFamily: f.medium, fontSize: 14, color: c.ink },
+});

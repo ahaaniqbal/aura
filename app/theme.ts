@@ -1,127 +1,78 @@
-// Aura design system v2 — "your people, alive."
-// Bold, glossy, gamified, spatial. Dream-gradient canvases, puffy stickers,
-// rounded Nunito display (the SF Pro Rounded twin), accents that mean something.
+// Aura design system v4: Swiss precision.
+// A cool, flat canvas where typography carries the design and hairlines do the separating.
+// Two accents with strict jobs: cobalt is Aura itself (its mark, its voice, links, focus,
+// brand surfaces); signal orange means "needs you now" and nothing else. Everything else is ink.
+import { Platform, StyleSheet } from "react-native";
+
 export const c = {
-  bg: "#F4F2FC",            // soft lavender-white base
-  surface: "#FFFFFF",
-  surfaceAlt: "#ECE8F8",
-  text: "#171334",          // ink
-  ink: "#171334",
-  muted: "#645E8C",         // ink-soft
-  hairline: "#E8E3F5",
+  canvas: "#FBFBFC",        // app canvas
+  surface: "#FEFEFF",       // fields, sheets, interactive containers
+  sunken: "#F1F2F5",        // user bubbles, pressed rows, empty bars
+  ink: "#0D0E12",           // text and primary buttons
+  ink2: "#4A4D57",          // secondary text
+  muted: "#6B6E79",         // tertiary text (4.9:1 on canvas)
+  faint: "#A3A6AF",         // placeholders, inactive icons
+  line: "#E3E5EA",          // hairlines
+  lineStrong: "#CDD0D7",    // rules, outlines
 
-  // brand + role accents
-  accent: "#7B5CFF",        // violet — primary/brand
-  accentSoft: "#EDE8FF",
-  accentMuted: "rgba(123,92,255,0.12)",
-  violet: "#7B5CFF",
-  blue: "#2FA9FF",
-  pink: "#FF5CA8",          // people / love
-  coral: "#FF5A5F",         // overdue / urgent
-  mint: "#1FD0A0",          // in touch / done
-  sunny: "#FFC93F",         // streaks / highlight
-  grape: "#3A2E7A",
+  accent: "#1A3CF0",        // cobalt: Aura, links, focus, selection, brand surfaces
+  accentTint: "#E8ECFE",
+  onAccent: "#FEFEFF",
+  onAccentMuted: "#C9D2FF", // secondary text on cobalt (4.8:1)
 
-  // semantic
-  success: "#12C88E",
-  successSoft: "#DCF7EE",
-  danger: "#FF5A5F",
-  dangerSoft: "#FFE9EA",
-  urgentBg: "#FFF0F1",
-  urgentBorder: "#FFC9CC",
+  signal: "#FF4F12",        // attention fill: badges, dots, recording
+  signalText: "#C93A06",    // attention text (5:1 on canvas)
+  signalTint: "#FFEDE6",
 
-  // legacy keys, remapped so existing screens stay cohesive
-  lavender: "#7B5CFF",
-  blush: "#FFE1F0",
-  sky: "#CFEBFF",
-  peach: "#FF7DBE",
-  userBubble: "#EAE4FF",
-  chipBg: "#EFEBFB",
-  overlay: "rgba(23,19,52,0.52)",
-  recording: "#FFDFEC",
-  recordingBorder: "#FF9CC6",
-  recordingIcon: "#D63384",
+  scrim: "rgba(13,14,18,0.4)",
+  onInk: "#FEFEFF",
 };
 
-// gradient stacks (use with expo-linear-gradient)
-export const grad = {
-  today: ["#6B54E8", "#7C5BF0", "#F1EEFF"] as const,   // top violet -> light
-  cons: ["#5A3EC8", "#6E4FE6", "#7C63F0"] as const,     // constellation canvas
-  violet: ["#8E6BFF", "#5B3EE8"] as const,
-  pink: ["#FF8DC5", "#FF4FA0"] as const,
-  mint: ["#5BF0C6", "#12CE96"] as const,
-  blue: ["#6FC6FF", "#2FA0FF"] as const,
-  sky: ["#EAF0FF", "#FDE7F3"] as const,
+export type Tone = "neutral" | "muted" | "accent" | "signal";
+export const toneColor: Record<Tone, string> = {
+  neutral: c.ink2,
+  muted: c.muted,
+  accent: c.accent,
+  signal: c.signalText,
 };
 
-export const orb = {
-  idle: ["#8E6BFF", "#5FA8FF", "#22D3A0"],
-  thinking: ["#8E6BFF", "#C46BFF", "#FF7DBE"],
-  warm: ["#FF7DBE", "#FFB65C", "#FFC93F"],
-} as const;
+export const f = {
+  regular: "Diatype-Regular",
+  medium: "Diatype-Medium",
+  bold: "Diatype-Bold",
+  black: "Diatype-Black",
+};
+
+export const fontAssets = {
+  [f.regular]: require("./assets/fonts/ABCDiatype-Regular.otf"),
+  [f.medium]: require("./assets/fonts/ABCDiatype-Medium.otf"),
+  [f.bold]: require("./assets/fonts/ABCDiatype-Bold.otf"),
+  [f.black]: require("./assets/fonts/ABCDiatype-Black.otf"),
+};
+
+// Type scale. Diatype runs tight at display sizes and neutral at reading sizes. Display is the
+// one place the type gets loud; everything below it steps down by at least 1.2x.
+export const t = StyleSheet.create({
+  display: { fontFamily: f.medium, fontSize: 38, lineHeight: 41, letterSpacing: -1.6, color: c.ink },
+  title1: { fontFamily: f.medium, fontSize: 28, lineHeight: 32, letterSpacing: -0.9, color: c.ink },
+  title2: { fontFamily: f.medium, fontSize: 21, lineHeight: 26, letterSpacing: -0.5, color: c.ink },
+  headline: { fontFamily: f.medium, fontSize: 16, lineHeight: 21, letterSpacing: -0.2, color: c.ink },
+  body: { fontFamily: f.regular, fontSize: 16, lineHeight: 23, letterSpacing: -0.1, color: c.ink },
+  callout: { fontFamily: f.regular, fontSize: 15, lineHeight: 21, letterSpacing: -0.1, color: c.ink2 },
+  subhead: { fontFamily: f.regular, fontSize: 14, lineHeight: 19, color: c.ink2 },
+  footnote: { fontFamily: f.regular, fontSize: 13, lineHeight: 17, color: c.muted },
+  label: { fontFamily: f.medium, fontSize: 15, lineHeight: 19, letterSpacing: -0.15, color: c.ink },
+  caption: { fontFamily: f.medium, fontSize: 12.5, lineHeight: 16, color: c.muted },
+});
 
 export const sp = { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, h: 32, xh: 40 };
-export const layout = { page: 20, control: 46, controlSm: 38 };
+export const layout = { page: 20 };
+export const r = { xs: 4, sm: 8, md: 12, lg: 16, pill: 999 };
 
-export const r = {
-  chip: 999,
-  button: 16,
-  bubble: 22,
-  bubbleTail: 7,
-  card: 24,
-  sheet: 30,
-  input: 16,
-  tab: 16,
-  tool: 20,
-  toolTile: 15,
-};
-
+// Only things that genuinely float (sheets) get a shadow. Everything else is flat.
 export const shadow = {
-  card: {
-    shadowColor: "#2A1B5A",
-    shadowOpacity: 0.13,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 13 },
-    elevation: 6,
-  },
-  soft: {
-    shadowColor: "#2A1B5A",
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 2,
-  },
-  // puffy sticker: a punchy colored drop (pair with a white border for the AMO look)
-  puff: {
-    shadowColor: "#2A1B5A",
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 7,
-  },
+  float: { shadowColor: "#0D0E12", shadowOpacity: 0.16, shadowRadius: 30, shadowOffset: { width: 0, height: 10 }, elevation: 10 },
 };
 
-// rounded, heavy, tracked tight (-2%) — the SF Pro Rounded feel via Nunito
-export const font = {
-  display: "Nunito_800ExtraBold",
-  displayMed: "Nunito_700Bold",
-  italic: "Nunito_600SemiBold",
-  body: "Nunito_500Medium",
-  medium: "Nunito_600SemiBold",
-  semibold: "Nunito_700Bold",
-  bold: "Nunito_800ExtraBold",
-};
-
-// global tracking to apply on display/label text
-export const tracking = -0.02;
-
-export const type = {
-  hero: 32,
-  h1: 27,
-  h2: 21,
-  title: 17,
-  body: 16,
-  subhead: 15,
-  caption: 13,
-  micro: 11,
-};
+// Text inputs draw their own focus state; drop the browser focus box on the web build.
+export const inputReset: any = Platform.OS === "web" ? { outlineStyle: "none" } : null;

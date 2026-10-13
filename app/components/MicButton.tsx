@@ -7,10 +7,12 @@ import * as Haptics from "expo-haptics";
 import { transcribe } from "../lib/api";
 import { c } from "../theme";
 
+// Tap to dictate, tap again to transcribe into the field. While recording the button turns
+// into an orange stop control with a slow pulse, so the state is never ambiguous.
 export default function MicButton({
   onResult,
   disabled,
-  size = 46,
+  size = 40,
   variant = "default",
 }: {
   onResult: (t: string) => void;
@@ -29,8 +31,8 @@ export default function MicButton({
   const startPulse = () => {
     loopRef.current = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.14, duration: 520, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 520, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.86, duration: 620, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 620, useNativeDriver: true }),
       ])
     );
     loopRef.current.start();
@@ -77,31 +79,34 @@ export default function MicButton({
     }
   };
 
-  const radius = size / 2;
-
   return (
     <Pressable
       onPress={toggle}
       disabled={disabled}
       hitSlop={8}
-      onPressIn={() => Animated.spring(press, { toValue: 0.96, useNativeDriver: true, friction: 7, tension: 140 }).start()}
-      onPressOut={() => Animated.spring(press, { toValue: 1, useNativeDriver: true, friction: 7, tension: 140 }).start()}
+      accessibilityRole="button"
+      accessibilityLabel={recording ? "Stop dictation" : "Dictate"}
+      onPressIn={() => Animated.timing(press, { toValue: 0.92, duration: 90, useNativeDriver: true }).start()}
+      onPressOut={() => Animated.timing(press, { toValue: 1, duration: 180, useNativeDriver: true }).start()}
       style={{
         width: size,
         height: size,
-        borderRadius: radius,
+        borderRadius: size / 2,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: recording ? c.recording : inline ? "transparent" : c.surfaceAlt,
-        borderWidth: inline ? 0 : 1,
-        borderColor: recording ? c.recordingBorder : c.hairline,
+        backgroundColor: recording ? c.signalTint : "transparent",
+        borderWidth: !inline && !recording ? 1 : 0,
+        borderColor: c.lineStrong,
+        opacity: disabled ? 0.4 : 1,
       }}
     >
       {working ? (
-        <ActivityIndicator color={c.text} size="small" />
+        <ActivityIndicator color={c.ink2} size="small" />
       ) : (
         <Animated.View style={{ transform: [{ scale: Animated.multiply(pulse, press) }] }}>
-          <Feather name={recording ? "square" : "mic"} size={inline ? 20 : 18} color={recording ? c.recordingIcon : c.muted} />
+          {recording
+            ? <Animated.View style={{ width: size * 0.3, height: size * 0.3, borderRadius: 3, backgroundColor: c.signal }} />
+            : <Feather name="mic" size={Math.round(size * 0.45)} color={c.ink2} />}
         </Animated.View>
       )}
     </Pressable>
