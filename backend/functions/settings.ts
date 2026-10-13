@@ -7,8 +7,8 @@ function json(d: any, s = 200): Response {
 }
 
 const PERSONALITIES = ["witty", "warm", "blunt", "chill"];
-// Aura's look: the palette it glows in, as the app's colors picker sets it. Stored after a shape check.
-const LOOK_KEYS: Record<string, RegExp> = { palette: /^[a-z]{2,12}$/ };
+// Aura's look: which gradient avatar it wears, as the app's picker sets it. Stored after a shape check.
+const LOOK_KEYS: Record<string, RegExp> = { avatar: /^[a-z]{2,12}$/ };
 function cleanLook(x: any): any {
   if (!x || typeof x !== "object") return null;
   const out: any = {};

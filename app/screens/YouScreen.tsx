@@ -8,7 +8,8 @@ import { c, f, inputReset, layout, r, sp, t } from "../theme";
 import { PERSONALITIES } from "../lib/personality";
 import type { McpServer, PairedAgent, Personality, Settings } from "../lib/api";
 import { personalityLabel } from "../lib/personality";
-import { palette } from "../lib/auras";
+import { avatarLabel } from "../lib/auras";
+import Avatar from "../components/Avatar";
 
 const TOOLS: { key: string; slug: string; brand: string; label: string; icon: IconName; sub: string }[] = [
   { key: "gmail", slug: "gmail", brand: "gmail", label: "Gmail", icon: "mail", sub: "Triage, drafts for your OK, receipts" },
@@ -41,12 +42,12 @@ export default function YouScreen({ settings, onSettings, onUnfiltered, serverCo
     <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <Text style={t.display} accessibilityRole="header">You</Text>
 
-      <Press onPress={onPersonalize} style={s.hero} scaleTo={0.99} accessibilityLabel="Change Aura's colors">
+      <Press onPress={onPersonalize} style={s.hero} scaleTo={0.99} accessibilityLabel="Change Aura's look">
         <Mark size={88} />
         <View style={{ flex: 1 }}>
           <Text style={t.title2}>Aura</Text>
-          <Text style={[t.footnote, { marginTop: 2 }]}>{personalityLabel(settings.personality)}  ·  {palette(settings.look.palette).label}</Text>
-          <Text style={[t.label, { marginTop: sp.s, color: c.accentText }]}>Change colors</Text>
+          <Text style={[t.footnote, { marginTop: 2 }]}>{personalityLabel(settings.personality)}  ·  {avatarLabel(settings.look.avatar)}</Text>
+          <Text style={[t.label, { marginTop: sp.s, color: c.accentText }]}>Change look</Text>
         </View>
       </Press>
 
@@ -147,7 +148,7 @@ export default function YouScreen({ settings, onSettings, onUnfiltered, serverCo
           <View key={a.id}>
             {i > 0 ? <Divider inset={38} /> : null}
             <View style={s.tool}>
-              <View style={s.logo}><Feather name="cpu" size={18} color={c.ink2} /></View>
+              <Avatar name={a.label} size={28} />
               <View style={{ flex: 1 }}>
                 <Text style={t.label}>{a.label}</Text>
                 <Text style={[t.footnote, { marginTop: 2 }]}>{a.recall_until ? `Can read your memory until ${timeOf(a.recall_until)}` : `Paired ${dayOf(a.created_at)}. Asks before reading or acting`}</Text>

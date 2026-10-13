@@ -4,15 +4,15 @@ import * as Haptics from "expo-haptics";
 import Mark from "./Mark";
 import { Button, Divider, IconButton, Press } from "./ui";
 import { c, layout, sp, t } from "../theme";
-import { AuraLook, normalizeLook, PALETTES } from "../lib/auras";
+import { AuraLook, AVATARS, normalizeLook } from "../lib/auras";
 
-// Pick the palette Aura glows in. Same radio list as the personality picker, with Aura itself as
-// the preview at the top: one choice, made by looking.
-export default function Personalize({ visible, initial, onSave, onClose, saveLabel = "Use these colors", inline }: {
+// Pick Aura's avatar. Same radio list as the personality picker, with Aura itself as the preview
+// at the top: one choice, made by looking.
+export default function Personalize({ visible, initial, onSave, onClose, saveLabel = "Use this look", inline }: {
   visible?: boolean; initial: AuraLook; onSave: (look: AuraLook) => void; onClose?: () => void; saveLabel?: string; inline?: boolean;
 }) {
   const [look, setLook] = useState<AuraLook>(normalizeLook(initial));
-  const pick = (key: string) => { Haptics.selectionAsync().catch(() => {}); setLook({ palette: key }); };
+  const pick = (key: AuraLook["avatar"]) => { Haptics.selectionAsync().catch(() => {}); setLook({ avatar: key }); };
 
   const body = (
     <View style={{ flex: 1 }}>
@@ -22,18 +22,18 @@ export default function Personalize({ visible, initial, onSave, onClose, saveLab
         </View>
       ) : null}
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        {!inline ? <Text style={t.title1} accessibilityRole="header">Aura's colors</Text> : null}
-        <View style={s.preview} accessibilityLabel={`Preview: ${PALETTES.find((p) => p.key === look.palette)?.label}`}>
+        {!inline ? <Text style={t.title1} accessibilityRole="header">Aura's look</Text> : null}
+        <View style={s.preview} accessibilityLabel={`Preview: ${AVATARS.find((p) => p.key === look.avatar)?.label}`}>
           <Mark size={180} look={look} />
         </View>
         <View style={s.list}>
-          {PALETTES.map((p, i) => {
-            const on = look.palette === p.key;
+          {AVATARS.map((p, i) => {
+            const on = look.avatar === p.key;
             return (
               <View key={p.key}>
                 {i > 0 ? <Divider inset={54} /> : null}
                 <Press onPress={() => pick(p.key)} style={s.option} scaleTo={0.99} accessibilityRole="radio" accessibilityLabel={`${p.label}. ${p.line}`}>
-                  <Mark size={40} look={{ palette: p.key }} dot={false} />
+                  <Mark size={40} look={{ avatar: p.key }} />
                   <View style={{ flex: 1 }}>
                     <Text style={t.label}>{p.label}</Text>
                     <Text style={[t.footnote, { marginTop: 2 }]}>{p.line}</Text>

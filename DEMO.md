@@ -4,7 +4,7 @@
 
 ## The two-minute demo (on the iPhone)
 
-1. **Sign up**, then **Pick Aura's colors**: the vermilion dot glows in the palette you choose. *"It's yours from the first screen."*
+1. **Sign up**, then **Pick Aura's look** from the gradient avatars. *"It's yours from the first screen."*
 2. **First run.** Pick a personality, answer "What's on your plate?". Aura shows back what it learned.
 3. **Food.** Ask *"find a great italian place for 4 on friday at 8"*. Places come back near you with ratings and Book a table. Tap it; approve the card; the booking page opens and dinner lands on your calendar.
 4. **Travel.** Ask *"flights to lisbon march 10 to 17"*. Real fares; tap one to book (approve the card). Then *"plan the trip, we like food and walking"*: a day-by-day plan appears, and it's on Today.
@@ -19,7 +19,7 @@
 
 ## Architecture
 
-- **Expo (React Native)**: Aura, Today, Memory and You tabs in ABC Diatype; gradient auras for people and for Aura; rich results in chat.
+- **Expo (React Native)**: Aura, Today, Memory and You tabs in ABC Diatype; gradient avatars for people, agents and Aura; rich results in chat.
 - **Butterbase**: Postgres and serverless functions (`agent`, `memory`, `web`, `places`, `travel`, `money`, `routines`, `routine_tick`, `mcp`, `a2a`, `approve`, `settings`, `capture`), Claude via the AI gateway. App id `app_6nromeez40uq`.
 - **Kaeva, ported**: memory graph, context ranker, A2A over MCP, privacy fingerprints. **Unblock** for Unfiltered.
 - **Composio** for Gmail, Calendar and other apps; **Google Places**, **Duffel**, **Exa/Tavily/Brave** when keys are set. See the README for every env var.

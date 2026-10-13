@@ -2,7 +2,7 @@
 
 **A personal AI that actually knows you.**
 
-Aura is one AI for your work and your life. You talk to it like a person, by text or voice. It remembers what you tell it and learns your tastes as you go, searches the web, finds restaurants and flights and books them with your OK, plans trips, keeps an eye on your inbox, calendar and spending, runs routines on its own, records meetings, and works with any app or agent you connect over MCP. It has a personality you pick, colors you choose, and an optional Unfiltered mode for adults.
+Aura is one AI for your work and your life. You talk to it like a person, by text or voice. It remembers what you tell it and learns your tastes as you go, searches the web, finds restaurants and flights and books them with your OK, plans trips, keeps an eye on your inbox, calendar and spending, runs routines on its own, records meetings, and works with any app or agent you connect over MCP. It has a personality you pick, a look you choose, and an optional Unfiltered mode for adults.
 
 Built by **Ahaan Iqbal**.
 
@@ -24,21 +24,21 @@ Built by **Ahaan Iqbal**.
 | Connect any MCP server | Paste a server address in You. Aura lists its tools, runs read-only ones directly, and asks before anything that changes something. |
 | Work with other agents (A2A) | Pair an agent with a one-time code. It can message you, ask to read your memory, or ask Aura to act; you approve each in Aura. |
 | Knows where you are | Location and timezone feed every answer and place reminders ("remind me when I'm at Trader Joe's"). |
-| Personality and colors | Witty, Warm, Blunt or Chill, and the palette Aura glows in. |
+| Personality and look | Witty, Warm, Blunt or Chill, and which gradient avatar Aura wears. |
 | Unfiltered | For adults who opt in, conversations run on Unblock's open-weight models. |
 
 Anything that leaves your world (sending, booking, paying, inviting, writing to another app) is never done silently: it becomes a card you approve, with five seconds to undo.
 
 ## The app
 
-Four tabs, ABC Diatype, near-white canvas, one vermilion accent, and gradient auras instead of initials.
+Four tabs, ABC Diatype, near-white canvas, one vermilion accent, and gradient avatars instead of initials.
 
 - **Aura.** The conversation. Results arrive as UI you can act on: places with Book a table, flights with prices, sources, trip plans, spending, meeting notes. Messages from paired agents show who sent them, with Reply.
 - **Today.** One sentence on your day, then what's waiting for your OK, what Aura runs on its own, what's on your plate, trips and money, and the people who could use you.
 - **Memory.** What Aura learned about you (Likes, Doesn't like, Work, Life, Places), your notes, your people and your reminders. Teach it directly; forget anything.
-- **You.** Aura's colors, personality, Unfiltered, your instructions, connected apps, MCP servers, paired agents, plan, sign out, delete account and data.
+- **You.** Aura's look, personality, Unfiltered, your instructions, connected apps, MCP servers, paired agents, plan, sign out, delete account and data.
 
-**Auras instead of initials.** Everyone gets an aura: a soft, grainy gradient from a curated palette, picked from their name so the same person always looks the same, with no faces and nothing guessed about who they are. Aura itself is the vermilion dot inside its own glow, which breathes while it works; you pick the palette it glows in (Ember, Clay, Bloom, Sun, Moss, Sea, Tide, Plum, Dune). Drawn as SVG in `app/lib/auras.ts`, with a grain texture laid over the top.
+**Gradient avatars instead of initials.** People, paired agents and Aura itself wear the gradient avatars from Oreo UI's Agentic UI Library: Flare, Nova, Void, Jade, Bloom and Silk. People get one picked from their name, so the same person always looks the same; you pick Aura's (Flare by default). They're recreated as SVG in `app/lib/auras.ts`.
 
 ## Built on Kaeva and Unblock
 
@@ -73,8 +73,8 @@ Butterbase  ──  serverless functions + Postgres + AI gateway (Claude)
 
 - `app/` is the Expo (React Native, TypeScript) app.
   - `screens/`: `AuraScreen`, `TodayScreen`, `MemoryScreen`, `YouScreen`, `AuthScreen`.
-  - `components/`: `ui.tsx` primitives, `Results.tsx` (places, flights, sources, trip, money, notes), `Personalize.tsx` (Aura's colors), `Avatar.tsx` and `Mark.tsx` (auras), sheets, onboarding, recorder.
-  - `lib/`: `api.ts`, `auras.ts` (palettes and gradient art), personalities, dates, toast.
+  - `components/`: `ui.tsx` primitives, `Results.tsx` (places, flights, sources, trip, money, notes), `Personalize.tsx` (Aura's look), `Avatar.tsx` and `Mark.tsx` (gradient avatars), sheets, onboarding, recorder.
+  - `lib/`: `api.ts`, `auras.ts` (the gradient avatars), personalities, dates, toast.
 - `backend/functions/` holds the Butterbase functions listed above, plus `capture` (recordings and quick notes), `feed`, `remember`, `graph`, `brief`, `note`, `sync_email`, `auto_tick`, `nudge_cron`, `pulse`, `connect`, `connections`, `set_location`, `set_timezone`, `register_device`, `transcribe`, `simulate`, `reset`.
 
 ## Environment
@@ -111,6 +111,10 @@ Open the QR in **Expo Go** (Expo SDK 54).
 - Account deletion erases all of Aura's data for the user; removing the sign-in itself needs Butterbase's admin API.
 - Unblock deployments expire after 30 to 60 minutes, and its README says live inference hasn't passed end to end yet. Aura falls back to the standard model when it's unavailable.
 - ABC Diatype is used under a trial license. App Store review needs an age rating that matches Unfiltered, a way to report content (Guidelines 1.1 and 1.2), and the in-app deletion that's now here (5.1.1(v)).
+
+## Credits
+
+Gradient avatars (Flare, Nova, Void, Jade, Bloom, Silk) are recreated from Oreo UI's Agentic UI Library (free version, Figma Community), which credits them as modified from Nikita Chistio's work, licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ---
 
