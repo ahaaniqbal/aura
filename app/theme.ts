@@ -19,8 +19,8 @@ export const c = {
   accent: "#FF4F12",        // vermilion fill: mark, brand fields, attention dots, recording
   accentText: "#C93A06",    // vermilion text on canvas (5:1)
   accentTint: "#FFEDE6",
-  onAccent: "#0D0E12",      // text on vermilion (5.9:1)
-  onAccentMuted: "#3A1405", // secondary text on vermilion (5:1)
+  onAccent: "#FFFFFF",      // text on vermilion
+  onAccentMuted: "rgba(255,255,255,0.78)", // unselected and secondary text on vermilion
 
   scrim: "rgba(13,14,18,0.4)",
   onInk: "#FEFEFF",

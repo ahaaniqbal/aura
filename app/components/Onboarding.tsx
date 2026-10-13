@@ -51,7 +51,7 @@ export default function Onboarding({ onDone, initialName, onLook }: { onDone: ()
 
   return (
     <SafeAreaView style={[s.root, brand && { backgroundColor: c.accent }]}>
-      <StatusBar style="dark" />
+      <StatusBar style={brand ? "light" : "dark"} />
       {qIndex > 0 ? (
         <View style={s.nav}>
           <IconButton icon="chevron-left" size={36} variant="plain" onPress={() => go(qIndex === 0 ? 0 : qSteps[qIndex - 1])} label="Back" />
@@ -142,16 +142,16 @@ export default function Onboarding({ onDone, initialName, onLook }: { onDone: ()
           {step === 5 && (
             <ScrollView contentContainerStyle={s.scrollPage}>
               <View style={{ flex: 1, justifyContent: "center", paddingVertical: sp.h }}>
-                <Text style={t.display}>{firstName ? `Aura's ready, ${firstName}.` : "Aura's ready."}</Text>
+                <Text style={[t.display, { color: c.onAccent }]}>{firstName ? `Aura's ready, ${firstName}.` : "Aura's ready."}</Text>
                 {known.length ? (
                   <>
-                    <Text style={[t.caption, { color: c.onAccentMuted, marginTop: sp.xl }]}>What it knows so far</Text>
+                    <Text style={[t.caption, { color: c.onAccent, marginTop: sp.xl }]}>What it knows so far</Text>
                     <View style={s.known}>
-                      {known.map((k, i) => <Text key={i} style={[t.body, s.knownItem, i > 0 && s.knownSep]}>{k}</Text>)}
+                      {known.map((k, i) => <Text key={i} style={[t.body, { color: c.onAccent }, s.knownItem, i > 0 && s.knownSep]}>{k}</Text>)}
                     </View>
                   </>
                 ) : (
-                  <Text style={[t.callout, { color: c.onAccentMuted, marginTop: sp.m }]}>{failed
+                  <Text style={[t.callout, { color: c.onAccent, marginTop: sp.m }]}>{failed
                     ? "That didn't save. Tell Aura about yourself in the chat whenever you're ready."
                     : "Talk to it about anything. The more it knows, the less you have to explain."}</Text>
                 )}
@@ -183,7 +183,7 @@ const s = StyleSheet.create({
   letterInput: { fontFamily: f.regular, fontSize: 17, lineHeight: 25, color: c.ink, minHeight: 150, padding: 0 },
   letterFoot: { flexDirection: "row", alignItems: "center", marginTop: sp.m, paddingTop: sp.m, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
   lookHead: { paddingHorizontal: 24, paddingTop: sp.l },
-  known: { marginTop: sp.s, borderTopWidth: 1, borderTopColor: c.ink },
+  known: { marginTop: sp.s, borderTopWidth: 1, borderTopColor: c.onAccent },
   knownItem: { paddingVertical: 11 },
-  knownSep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(13,14,18,0.25)" },
+  knownSep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(255,255,255,0.45)" },
 });

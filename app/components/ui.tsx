@@ -121,7 +121,7 @@ export function Tabs<T extends string>({ options, value, onChange, style, onDark
   const on = onDark ? c.onAccent : c.ink;
   const off = onDark ? c.onAccentMuted : c.muted;
   return (
-    <View style={[{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: onDark ? "rgba(13,14,18,0.3)" : c.lineStrong }, style]}>
+    <View style={[{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: onDark ? "rgba(255,255,255,0.45)" : c.lineStrong }, style]}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 22 }}>
         {options.map((o) => {
           const sel = o.key === value;

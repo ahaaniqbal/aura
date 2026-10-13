@@ -43,12 +43,12 @@ export default function AuthScreen({ onAuthed }: { onAuthed: (isNew: boolean, na
 
   return (
     <SafeAreaView style={s.fill}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled">
-          <View style={{ paddingTop: sp.l }}><Wordmark /></View>
+          <View style={{ paddingTop: sp.l }}><Wordmark color={c.onAccent} /></View>
           <View style={{ flex: 1, justifyContent: "flex-end", paddingTop: sp.xh }}>
-            <Text style={t.hero} accessibilityRole="header">{"A personal AI\nthat actually\nknows you."}</Text>
+            <Text style={[t.hero, { color: c.onAccent }]} accessibilityRole="header">{"A personal AI\nthat actually\nknows you."}</Text>
 
             <Tabs onDark style={{ marginTop: sp.h }} value={mode} onChange={(m) => { setErr(""); setMode(m); }}
               options={[{ key: "login", label: "Log in" }, { key: "signup", label: "Create account" }]} />
@@ -61,7 +61,7 @@ export default function AuthScreen({ onAuthed }: { onAuthed: (isNew: boolean, na
               </Pressable>)}
 
             {err ? (
-              <View style={s.err} accessibilityLiveRegion="polite"><Feather name="alert-circle" size={15} color={c.ink} /><Text style={s.errTxt}>{err}</Text></View>
+              <View style={s.err} accessibilityLiveRegion="polite"><Feather name="alert-circle" size={15} color={c.onAccent} /><Text style={s.errTxt}>{err}</Text></View>
             ) : null}
             <Button label={mode === "login" ? "Log in" : "Create account"} onPress={submit} loading={busy} style={{ marginTop: sp.xl }} />
           </View>
@@ -84,10 +84,10 @@ function friendly(raw: string, mode: "login" | "signup"): string {
 const s = StyleSheet.create({
   fill: { flex: 1, backgroundColor: c.accent },
   page: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 24 },
-  label: { fontFamily: f.medium, fontSize: 13, color: c.onAccentMuted, marginBottom: 6 },
+  label: { fontFamily: f.medium, fontSize: 13, color: c.onAccent, marginBottom: 6 },
   input: { height: 52, flexDirection: "row", alignItems: "center", backgroundColor: c.surface, borderRadius: r.sm, borderWidth: 2, borderColor: c.surface },
   inputFocus: { borderColor: c.ink },
   inputText: { flex: 1, height: 48, paddingHorizontal: 14, fontFamily: f.regular, fontSize: 16, color: c.ink },
   err: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: sp.m },
-  errTxt: { fontFamily: f.medium, fontSize: 14, color: c.ink, flex: 1 },
+  errTxt: { fontFamily: f.medium, fontSize: 14, color: c.onAccent, flex: 1 },
 });
