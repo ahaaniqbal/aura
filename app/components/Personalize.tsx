@@ -9,7 +9,7 @@ import { c, f, sp, t } from "../theme";
 import { ACCESSORIES, AuraLook, BACKDROPS, EXPRESSIONS, SWATCHES, TEXTURES, auraSvg, normalizeLook } from "../lib/faces";
 
 // Dress Aura up. Every option is shown as Aura wearing it, so you pick by looking, not by reading.
-export default function Personalize({ visible, initial, onSave, onClose, saveLabel = "Save look", inline }: {
+export default function Personalize({ visible, initial, onSave, onClose, saveLabel = "Use this look", inline }: {
   visible?: boolean; initial: AuraLook; onSave: (look: AuraLook) => void; onClose?: () => void; saveLabel?: string; inline?: boolean;
 }) {
   const [look, setLook] = useState<AuraLook>(normalizeLook(initial));

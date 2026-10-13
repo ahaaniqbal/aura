@@ -11,16 +11,16 @@ import { personalityLabel } from "../lib/personality";
 import { swatch, TEXTURES } from "../lib/faces";
 
 const TOOLS: { key: string; slug: string; brand: string; label: string; icon: IconName; sub: string }[] = [
-  { key: "gmail", slug: "gmail", brand: "gmail", label: "Gmail", icon: "mail", sub: "Read and write emails, find receipts" },
-  { key: "gcal", slug: "google-calendar", brand: "googlecalendar", label: "Google Calendar", icon: "calendar", sub: "Manage your calendar, prep for meetings" },
-  { key: "drive", slug: "googledrive", brand: "googledrive", label: "Google Drive", icon: "folder", sub: "Find and share files" },
-  { key: "slack", slug: "slack", brand: "slack", label: "Slack", icon: "slack", sub: "Search and send messages" },
-  { key: "notion", slug: "notion", brand: "notion", label: "Notion", icon: "file-text", sub: "Search your workspace" },
-  { key: "linear", slug: "linear", brand: "linear", label: "Linear", icon: "check-square", sub: "Manage issues" },
-  { key: "github", slug: "github", brand: "github", label: "GitHub", icon: "github", sub: "Track PRs and issues" },
-  { key: "todoist", slug: "todoist", brand: "todoist", label: "Todoist", icon: "check-circle", sub: "Your tasks, both ways" },
-  { key: "spotify", slug: "spotify", brand: "spotify", label: "Spotify", icon: "music", sub: "Play and queue music" },
-  { key: "strava", slug: "strava", brand: "strava", label: "Strava", icon: "activity", sub: "Your runs and rides" },
+  { key: "gmail", slug: "gmail", brand: "gmail", label: "Gmail", icon: "mail", sub: "Triage, drafts for your OK, receipts" },
+  { key: "gcal", slug: "google-calendar", brand: "googlecalendar", label: "Google Calendar", icon: "calendar", sub: "Your schedule, free time and invites" },
+  { key: "drive", slug: "googledrive", brand: "googledrive", label: "Google Drive", icon: "folder", sub: "Docs Aura can pull from when you ask" },
+  { key: "slack", slug: "slack", brand: "slack", label: "Slack", icon: "slack", sub: "Mentions and DMs that are waiting on you" },
+  { key: "notion", slug: "notion", brand: "notion", label: "Notion", icon: "file-text", sub: "Your notes, searchable from the chat" },
+  { key: "linear", slug: "linear", brand: "linear", label: "Linear", icon: "check-square", sub: "What's assigned to you, and what moved" },
+  { key: "github", slug: "github", brand: "github", label: "GitHub", icon: "github", sub: "Reviews and mentions that need you" },
+  { key: "todoist", slug: "todoist", brand: "todoist", label: "Todoist", icon: "check-circle", sub: "Tasks kept in step with Aura's" },
+  { key: "spotify", slug: "spotify", brand: "spotify", label: "Spotify", icon: "music", sub: "Music when you ask for it" },
+  { key: "strava", slug: "strava", brand: "strava", label: "Strava", icon: "activity", sub: "Your training, for planning around it" },
   { key: "whatsapp", slug: "", brand: "whatsapp", label: "WhatsApp", icon: "message-circle", sub: "Not available yet" },
 ];
 
@@ -110,7 +110,7 @@ export default function YouScreen({ settings, onSettings, onUnfiltered, serverCo
                 </View>
                 {on ? (
                   <View style={s.on}><Feather name="check" size={14} color={c.ink} /><Text style={s.onTxt}>Connected</Text></View>
-                ) : can ? <IconButton icon="plus" size={32} onPress={() => onConnect(x.slug)} label={`Connect ${x.label}`} style={{ borderRadius: 16 }} /> : null}
+                ) : can ? <Button label="Connect" size="sm" variant="secondary" onPress={() => onConnect(x.slug)} /> : null}
               </View>
             </View>
           );

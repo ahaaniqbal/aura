@@ -9,7 +9,7 @@
 3. **Food.** Ask *"find a great italian place for 4 on friday at 8"*. Places come back near you with ratings and Book a table. Tap it; approve the card; the booking page opens and dinner lands on your calendar.
 4. **Travel.** Ask *"flights to lisbon march 10 to 17"*. Real fares; tap one to book (approve the card). Then *"plan the trip, we like food and walking"*: a day-by-day plan appears, and it's on Today.
 5. **Memory.** Memory tab: Likes, Doesn't like, Work, Life, learned from conversation, each one forgettable. Tell Aura *"actually i moved to oakland"* and Home updates.
-6. **Routines.** Today: Morning brief is on. Open it, Run it now. Turn on Meeting prep.
+6. **Routines.** Today: Start of day is on. Open it, Run it now. Switch on Before each meeting.
 7. **Money.** *"how much have i spent on eating out this month?"*: categories against budgets, recurring charges.
 8. **Apps and agents.** You tab: connect an MCP server by address. Pair an agent with the code; when it asks something, it shows up in chat with Reply.
 9. **Demo triggers.** Long-press Aura's face in the chat header (or the Demo button in development builds) for the urgent-email and bakery scenarios.

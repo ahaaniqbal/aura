@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Avatar from "../components/Avatar";
 import ActionCard from "../components/ActionCard";
-import { Button, Divider, Empty, IconName, LinkButton, Press, Section, Status } from "../components/ui";
+import { Button, Divider, Empty, LinkButton, Press, Section, Status, Toggle } from "../components/ui";
 import { usd } from "../components/Results";
 import { c, f, layout, r, sp, t, Tone, toneColor } from "../theme";
 import { contactStats, isDrifting, warmth } from "../lib/weight";
@@ -21,12 +21,12 @@ function joinList(xs: string[]): string {
 
 // The brief for work and life: what's waiting for your OK, what's on your plate, and who could
 // use you. It leads with a sentence, not a dashboard.
-export default function TodayScreen({ loaded, approvals, onAct, onEdit, busy, scheduled, places, onReminderDone, promises, people, onDone, onOpenPerson, onAsk, onRecord, onBrief, status, statusTone, routines, connected, onRoutine, onConnect, trips, onTrip, money, onMoney }: {
+export default function TodayScreen({ loaded, approvals, onAct, onEdit, busy, scheduled, places, onReminderDone, promises, people, onDone, onOpenPerson, onAsk, onRecord, onBrief, status, statusTone, routines, connected, onRoutine, onToggleRoutine, onConnect, trips, onTrip, money, onMoney }: {
   loaded: boolean; approvals: ActionItem[]; onAct: (c: ActionItem, d: "approve" | "decline") => void; onEdit: (c: ActionItem) => void; busy: boolean;
   scheduled: Reminder[]; places: PlaceReminder[]; onReminderDone: (id: string) => void;
   promises: PromiseItem[]; people: GraphPerson[]; onDone: (text: string) => void; onOpenPerson: (name: string) => void;
   onAsk: () => void; onRecord: () => void; onBrief: () => void; status: string; statusTone: Tone;
-  routines: Routine[]; connected: string[]; onRoutine: (r: Routine) => void; onConnect: (slug: string) => void;
+  routines: Routine[]; connected: string[]; onRoutine: (r: Routine) => void; onToggleRoutine: (r: Routine, on: boolean) => void; onConnect: (slug: string) => void;
   trips: Trip[]; onTrip: (t: Trip) => void; money: MoneySummary | null; onMoney: () => void;
 }) {
   const plate = scheduled.filter((x) => x.bucket === "today" || x.bucket === "tomorrow");
@@ -104,10 +104,13 @@ export default function TodayScreen({ loaded, approvals, onAct, onEdit, busy, sc
       ) : null}
 
       {routines.length ? (
-        <Section title="Routines" meta="Aura does these on its own">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.rail} style={s.railWrap}>
-            {routines.map((r) => <RoutineTile key={r.id} r={r} connected={connected} onPress={() => onRoutine(r)} onConnect={onConnect} />)}
-          </ScrollView>
+        <Section title="Running on its own" meta={`${routines.filter((r) => r.active).length} on`}>
+          {routines.map((r, i) => (
+            <View key={r.id}>
+              {i > 0 ? <Divider /> : null}
+              <RoutineRow r={r} connected={connected} onPress={() => onRoutine(r)} onToggle={(on) => onToggleRoutine(r, on)} onConnect={onConnect} />
+            </View>
+          ))}
         </Section>
       ) : null}
 
@@ -183,30 +186,21 @@ export default function TodayScreen({ loaded, approvals, onAct, onEdit, busy, sc
   );
 }
 
-const ROUTINE_ICON: Record<string, IconName> = { brief: "sun", meeting_prep: "users", inbox: "inbox", wrap: "moon", money: "credit-card" };
-const APP_NAME: Record<string, string> = { googlecalendar: "Google Calendar", gmail: "Gmail" };
-// One routine, like Caddy's: what it does, and whether it's on. Needs a connection? Say which.
-function RoutineTile({ r, connected, onPress, onConnect }: { r: Routine; connected: string[]; onPress: () => void; onConnect: (slug: string) => void }) {
+const APP_NAME: Record<string, string> = { googlecalendar: "Calendar", gmail: "Gmail" };
+// A routine reads like a line in the day: when, what, and a switch.
+function RoutineRow({ r, connected, onPress, onToggle, onConnect }: { r: Routine; connected: string[]; onPress: () => void; onToggle: (on: boolean) => void; onConnect: (slug: string) => void }) {
   const missing = r.needs && !connected.some((x) => x.replace(/[-_]/g, "") === r.needs) ? r.needs : null;
   return (
-    <Press onPress={onPress} style={s.tile} scaleTo={0.98} accessibilityLabel={`${r.title}. ${r.active ? "On" : "Off"}. ${r.blurb || ""}`}>
-      <View style={s.tileIcon}><Feather name={ROUTINE_ICON[r.kind] || "repeat"} size={17} color={r.active ? c.accentText : c.ink2} /></View>
-      <Text style={[t.label, { marginTop: sp.m }]} numberOfLines={1}>{r.title}</Text>
-      <Text style={[t.footnote, { marginTop: 3, minHeight: 36 }]} numberOfLines={2}>{r.blurb || r.prompt}</Text>
-      <View style={s.tileFoot}>
-        {missing ? (
-          <Press onPress={() => onConnect(missing === "googlecalendar" ? "google-calendar" : missing)} hitSlop={6} accessibilityLabel={`Connect ${APP_NAME[missing] || missing}`} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <Text style={[t.caption, { color: c.ink }]}>Connect {APP_NAME[missing] || missing}</Text>
-            <Feather name="chevron-right" size={13} color={c.ink} />
-          </Press>
-        ) : (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <View style={[s.state, r.active && s.stateOn]} />
-            <Text style={[t.caption, r.active && { color: c.ink }]}>{r.active ? `On${r.cadence !== "before_meetings" ? ", " + clockLabel(r.at) : ""}` : "Off"}</Text>
-          </View>
-        )}
-      </View>
-    </Press>
+    <View style={s.item}>
+      <Text style={[s.when, !r.active && { color: c.muted }]} numberOfLines={2}>{r.cadence === "before_meetings" ? "Before meetings" : clockLabel(r.at)}</Text>
+      <Press onPress={onPress} style={{ flex: 1 }} scaleTo={0.99} accessibilityLabel={`${r.title}. ${r.blurb || ""}. Details`}>
+        <Text style={[t.body, !r.active && { color: c.ink2 }]}>{r.title}</Text>
+        <Text style={[t.footnote, { marginTop: 2 }]} numberOfLines={2}>{r.blurb || r.prompt}</Text>
+      </Press>
+      {missing
+        ? <Button label={`Connect ${APP_NAME[missing] || missing}`} size="sm" variant="secondary" onPress={() => onConnect(missing === "googlecalendar" ? "google-calendar" : missing)} />
+        : <Toggle value={r.active} onChange={onToggle} label={`${r.title} on`} />}
+    </View>
   );
 }
 function clockLabel(at: string) { const [h, m] = String(at || "08:00").split(":").map((x) => parseInt(x, 10)); return `${h % 12 || 12}:${String(m || 0).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`; }
@@ -242,11 +236,4 @@ const s = StyleSheet.create({
   item: { flexDirection: "row", alignItems: "flex-start", gap: 14, paddingVertical: 13 },
   when: { width: 76, fontFamily: f.medium, fontSize: 14, lineHeight: 23, color: c.ink2 },
   check: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: c.control },
-  railWrap: { marginHorizontal: -layout.page },
-  rail: { paddingHorizontal: layout.page, paddingTop: sp.m, paddingBottom: sp.xs, gap: 10 },
-  tile: { width: 196, padding: 14, borderRadius: r.md, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface },
-  tileIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: c.sunken, alignItems: "center", justifyContent: "center" },
-  tileFoot: { marginTop: sp.m, paddingTop: sp.s, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line, minHeight: 28, justifyContent: "center" },
-  state: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: c.control },
-  stateOn: { backgroundColor: c.accent, borderColor: c.accent },
 });

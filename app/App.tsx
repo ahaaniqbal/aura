@@ -229,10 +229,12 @@ function AuraApp({ onSignOut, onLook }: { onSignOut: () => void; onLook: (l: Aur
   const toggleRoutine = async (r: Routine, on: boolean) => {
     Haptics.selectionAsync().catch(() => {});
     const next = { ...r, active: on };
-    setRoutines((xs) => xs.map((x) => (x.id === r.id ? next : x))); setRoutineOpen(next);
+    // keep the sheet in step only if it's the one open; a switch on Today never opens it
+    const sync = (v: Routine) => { setRoutines((xs) => xs.map((x) => (x.id === r.id ? v : x))); setRoutineOpen((cur) => (cur && cur.id === r.id ? v : cur)); };
+    sync(next);
     const res: any = await updateRoutine(r.id, { active: on });
-    if (!res?.routine) { setRoutines((xs) => xs.map((x) => (x.id === r.id ? r : x))); setRoutineOpen(r); flash("Couldn't change that. Try again."); }
-    else { setRoutines((xs) => xs.map((x) => (x.id === r.id ? res.routine : x))); setRoutineOpen(res.routine); flash(on ? `${r.title} is on.` : `${r.title} is off.`); }
+    if (!res?.routine) { sync(r); flash("Couldn't change that. Try again."); }
+    else { sync(res.routine); flash(on ? `${r.title} is on.` : `${r.title} is off.`); }
   };
   const runRoutineNow = async (r: Routine) => {
     setRoutineRunning(true);
@@ -503,7 +505,7 @@ function AuraApp({ onSignOut, onLook }: { onSignOut: () => void; onLook: (l: Aur
             scheduled={remember.scheduled} places={remember.places} onReminderDone={onReminderDone}
             promises={graph.promises} people={graph.people} onDone={donePromise} onOpenPerson={openPerson}
             onAsk={openChat} onRecord={() => setRecOpen(true)} onBrief={briefFlow} status={status} statusTone={statusTone}
-            routines={routines} connected={serverConnected} onRoutine={setRoutineOpen} onConnect={connectFlow}
+            routines={routines} connected={serverConnected} onRoutine={setRoutineOpen} onToggleRoutine={toggleRoutine} onConnect={connectFlow}
             trips={trips} onTrip={setTripOpen} money={money} onMoney={() => setMoneyOpen(true)} />
         )}
         {tab === "memory" && (

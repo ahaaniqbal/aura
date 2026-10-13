@@ -1,6 +1,6 @@
 // Routines: things Aura does on its own, on a clock. A routine is a prompt plus a schedule in
 // the user's own timezone. routine_tick runs the ones that are due through the agent, so a
-// routine can use every tool Aura has. "Meeting prep" is the one event-driven kind: it runs
+// routine can use every tool Aura has. "Before each meeting" is the one event-driven kind: it runs
 // before each calendar event with other people in it.
 //
 // Ops: list | create {title, prompt, cadence, at, weekday?} | update {id, ...} | delete {id} | run {id}
@@ -17,11 +17,11 @@ function who(req: Request, ctx: any, body: any): string | null {
 
 const CADENCES = ["daily", "weekdays", "weekly", "monthly", "before_meetings"];
 const DEFAULTS = [
-  { kind: "brief", title: "Morning brief", blurb: "A short text with your day ahead", prompt: "Write my morning brief: today's calendar, anything in my inbox that needs me, what's due, birthdays coming up, and the weather if you can find it. Keep it short, lead with what matters most.", cadence: "daily", at: "08:00", active: true },
-  { kind: "meeting_prep", title: "Meeting prep", blurb: "Context on everyone you meet, before you meet", prompt: "Prep me for this meeting: who's in it, what I know about each of them, our last emails, and anything I promised them.", cadence: "before_meetings", at: "00:30", active: false, needs: "googlecalendar" },
-  { kind: "inbox", title: "Inbox sweep", blurb: "Flags what needs you and drafts the replies", prompt: "Go through my inbox from the last day. Tell me what actually needs me, draft replies for the ones I should answer, and skip the noise.", cadence: "weekdays", at: "09:30", active: false, needs: "gmail" },
-  { kind: "wrap", title: "Evening wrap", blurb: "What got done, and what's waiting for tomorrow", prompt: "Wrap up my day: what got done, what slipped, what's first tomorrow, and anything I said I'd do for someone.", cadence: "daily", at: "21:00", active: false },
-  { kind: "money", title: "Money check", blurb: "Your week's spending against your budgets", prompt: "Scan my receipts, then tell me how this week's spending looks against my budgets and flag any new subscriptions.", cadence: "weekly", at: "18:00", weekday: 0, active: false },
+  { kind: "brief", title: "Start of day", blurb: "Your day in one message, before you open anything else", prompt: "Write my start of day message: today's calendar, anything in my inbox that needs me, what's due, birthdays coming up, and the weather if you can find it. Keep it short, lead with what matters most.", cadence: "daily", at: "08:00", active: true },
+  { kind: "meeting_prep", title: "Before each meeting", blurb: "Who's in it, what you last talked about, what you owe them", prompt: "Prep me for this meeting: who's in it, what I know about each of them, our last emails, and anything I promised them.", cadence: "before_meetings", at: "00:30", active: false, needs: "googlecalendar" },
+  { kind: "inbox", title: "Inbox triage", blurb: "Only what needs you, with the replies already drafted", prompt: "Go through my inbox from the last day. Tell me what actually needs me, draft replies for the ones I should answer, and skip the noise.", cadence: "weekdays", at: "09:30", active: false, needs: "gmail" },
+  { kind: "wrap", title: "End of day", blurb: "What got done, what slipped, what's first tomorrow", prompt: "Wrap up my day: what got done, what slipped, what's first tomorrow, and anything I said I'd do for someone.", cadence: "daily", at: "21:00", active: false },
+  { kind: "money", title: "Sunday money", blurb: "Where the week's money went, against your budgets", prompt: "Scan my receipts, then tell me how this week's spending looks against my budgets and flag any new subscriptions.", cadence: "weekly", at: "18:00", weekday: 0, active: false },
 ];
 
 // Minutes east of UTC for a timezone at a given instant.

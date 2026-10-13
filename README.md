@@ -19,7 +19,7 @@ Built by **Ahaan Iqbal**.
 | Manage email | Search, read, archive, and draft replies that send through Gmail after you approve. |
 | Manage your calendar | Read, find free time, add events. Invites to other people are a card first. |
 | Money | Log spending by telling Aura, find receipts in Gmail, monthly budgets per category, recurring charges spotted automatically. |
-| Routines | Caddy-style: Morning brief, Meeting prep (before meetings with other people), Inbox sweep, Evening wrap, Money check, or your own ("every Friday at 5, summarize my week"). |
+| Routines | Start of day, Before each meeting (with other people), Inbox triage, End of day, Sunday money, or your own ("every Friday at 5, summarize my week"). |
 | Record meetings in person | Record, transcribe, and get notes: summary, decisions, action items. Your action items become tasks; the transcript goes into memory. |
 | Connect any MCP server | Paste a server address in You. Aura lists its tools, runs read-only ones directly, and asks before anything that changes something. |
 | Work with other agents (A2A) | Pair an agent with a one-time code. It can message you, ask to read your memory, or ask Aura to act; you approve each in Aura. |
@@ -34,7 +34,7 @@ Anything that leaves your world (sending, booking, paying, inviting, writing to 
 Four tabs, ABC Diatype, near-white canvas, one vermilion accent, and designed characters instead of initials.
 
 - **Aura.** The conversation. Results arrive as UI you can act on: places with Book a table, flights with prices, sources, trip plans, spending, meeting notes. Messages from paired agents show who sent them, with Reply.
-- **Today.** One sentence on your day, then what's waiting for your OK, your routines, what's on your plate, trips and money, and the people who could use you.
+- **Today.** One sentence on your day, then what's waiting for your OK, what Aura runs on its own, what's on your plate, trips and money, and the people who could use you.
 - **Memory.** What Aura learned about you (Likes, Doesn't like, Work, Life, Places), your notes, your people and your reminders. Teach it directly; forget anything.
 - **You.** Aura's look, personality, Unfiltered, your instructions, connected apps, MCP servers, paired agents, plan, sign out, delete account and data.
 

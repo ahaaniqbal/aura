@@ -1,6 +1,6 @@
 // Cron trigger "*/5 * * * *", service role. Runs every routine that's due through the agent (so
 // a routine can search, check the calendar, draft, book), posts the reply into the user's chat,
-// and pushes it to their phone. Meeting prep runs ~30 minutes before calendar events that have
+// and pushes it to their phone. "Before each meeting" runs ~30 minutes before calendar events that have
 // other people in them, once per event.
 
 function json(d: any, s = 200): Response {
